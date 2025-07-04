@@ -5,6 +5,7 @@
     "type": "module",
     "scripts": {
         "dev": "nodemon index.ts",
+        "prebuild": "npm install --include=dev",
         "build": "tsc",
         "start": "node dist/index.js"
     },
