@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
-import Board from '../models/Board';
-import User from '../models/User';
-import auth from '../middleware/auth';
+import Board from '../models/Board.js';
+import User from '../models/User.js';
+import auth from '../middleware/auth.js';
 import { v4 as uuidv4 } from 'uuid';
 
 const router = express.Router();

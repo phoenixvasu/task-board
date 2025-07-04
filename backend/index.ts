@@ -2,9 +2,9 @@ import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import authRoutes from "./routes/auth";
-import boardRoutes from "./routes/board";
-import userRoutes from "./routes/user";
+import authRoutes from "./routes/auth.js";
+import boardRoutes from "./routes/board.js";
+import userRoutes from "./routes/user.js";
 
 dotenv.config();
 
