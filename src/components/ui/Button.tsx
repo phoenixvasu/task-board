@@ -37,13 +37,25 @@ const Button: React.FC<ButtonProps> = ({
 
   const classes = `${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`;
 
+  // Remove all event handlers that conflict with framer-motion
+  // List of known conflicting props
+  const {
+    onAnimationStart,
+    onDragStart,
+    onDrag,
+    onDragEnd,
+    onPointerDownCapture,
+    onPointerMoveCapture,
+    onPointerUpCapture,
+    ...restProps
+  } = props;
   return (
     <motion.button
       className={classes}
       disabled={disabled || loading}
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
-      {...props}
+      {...restProps}
     >
       {loading && (
         <motion.div

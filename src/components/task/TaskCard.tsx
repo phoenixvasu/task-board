@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
 import { useBoardStore } from '../../store/useBoardStore';
-import { useAuthStore } from '../../store/useAuthStore';
 import { useDraggable } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
-import { Edit, Trash2, User, Calendar, ChevronDown } from 'lucide-react';
+import { Edit, Trash2, User, Calendar } from 'lucide-react';
 import Tag from '../ui/Tag';
-import Avatar from '../ui/Avatar';
 import Modal from '../ui/Modal';
 import Dropdown from '../ui/Dropdown';
 import Button from '../ui/Button';
@@ -19,22 +17,20 @@ interface TaskCardProps {
   columnId: string;
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ taskId, boardId, columnId }) => {
-  const { getTask, updateTask, deleteTask, getBoard } = useBoardStore();
+const TaskCard: React.FC<TaskCardProps> = ({ taskId, boardId }) => {
+  const { getTask, updateTask, deleteTask } = useBoardStore();
   const { users } = useBoardStore();
-  const { user } = useAuthStore();
   const task = getTask(boardId, taskId);
-  const board = getBoard(boardId);
   const [showEdit, setShowEdit] = useState(false);
-  const [editTask, setEditTask] = useState(task);
+  const [editTask, setEditTask] = useState(task as typeof task | null);
   const [isLoading, setIsLoading] = useState(false);
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: taskId });
 
-  if (!task) return null;
+  if (!task || !editTask) return null;
 
   const handleEditTask = async () => {
-    if (!editTask.title.trim()) {
+    if (!editTask || !editTask.title.trim()) {
       toast.error('Please enter a task title');
       return;
     }
@@ -98,14 +94,14 @@ const TaskCard: React.FC<TaskCardProps> = ({ taskId, boardId, columnId }) => {
           <input
             type="text"
             value={editTask.title}
-            onChange={e => setEditTask({ ...editTask, title: e.target.value })}
+            onChange={e => setEditTask(editTask ? { ...editTask, title: e.target.value } : null)}
             className="input w-full"
             placeholder="Task title"
             autoFocus
           />
           <textarea
             value={editTask.description}
-            onChange={e => setEditTask({ ...editTask, description: e.target.value })}
+            onChange={e => setEditTask(editTask ? { ...editTask, description: e.target.value } : null)}
             className="textarea w-full"
             placeholder="Task description (supports markdown)"
             rows={4}
@@ -114,19 +110,19 @@ const TaskCard: React.FC<TaskCardProps> = ({ taskId, boardId, columnId }) => {
             <Dropdown
               options={['low','medium','high'].map(p => ({ value: p, label: p.charAt(0).toUpperCase()+p.slice(1) }))}
               value={editTask.priority}
-              onChange={val => setEditTask({ ...editTask, priority: val })}
+              onChange={val => setEditTask(editTask ? { ...editTask, priority: val as typeof editTask.priority } : null)}
               placeholder="Priority"
             />
             <Dropdown
               options={users.map(u => ({ value: u.id, label: u.name }))}
               value={editTask.assignedTo}
-              onChange={val => setEditTask({ ...editTask, assignedTo: val })}
+              onChange={val => setEditTask(editTask ? { ...editTask, assignedTo: val } : null)}
               placeholder="Assign to"
             />
             <input
               type="date"
               value={editTask.dueDate?.slice(0,10) || ''}
-              onChange={e => setEditTask({ ...editTask, dueDate: e.target.value })}
+              onChange={e => setEditTask(editTask ? { ...editTask, dueDate: e.target.value } : null)}
               className="input"
             />
           </div>

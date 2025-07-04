@@ -1,12 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useBoardStore } from '../store/useBoardStore';
-import { useAuthStore } from '../store/useAuthStore';
 import BoardColumns from '../components/board/BoardColumns';
 import Button from '../components/ui/Button';
-import { ChevronLeft, Filter, Search, SortAsc, SortDesc, Users, Calendar } from 'lucide-react';
+import { ChevronLeft, SortAsc, SortDesc, Calendar } from 'lucide-react';
 import Dropdown from '../components/ui/Dropdown';
-import toast from 'react-hot-toast';
 import { useSearchStore } from '../store/useSearchStore';
 
 const BoardDetail: React.FC = () => {
@@ -18,7 +16,7 @@ const BoardDetail: React.FC = () => {
   const [assignee, setAssignee] = useState('');
   const [sort, setSort] = useState<'priority'|'dueDate'|'createdAt'|'title'>('createdAt');
   const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc');
-  const { searchTerm, setPage, reset } = useSearchStore();
+  const { searchTerm, setPage } = useSearchStore();
 
   useEffect(() => {
     setPage('tasks');

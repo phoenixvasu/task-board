@@ -5,8 +5,6 @@ import {
   Trello, 
   Plus, 
   Search, 
-  Bell, 
-  Settings, 
   LogOut, 
   User,
   Moon,

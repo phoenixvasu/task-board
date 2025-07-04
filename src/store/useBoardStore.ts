@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Board, Task, Column, Priority } from '../types';
+import { Board, Task, Column } from '../types';
 import { api } from '../api';
 import { useAuthStore } from './useAuthStore';
 
@@ -41,7 +41,6 @@ interface BoardState {
 }
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
-const getCurrentTimestamp = () => new Date().toISOString();
 
 export const useBoardStore = create<BoardState>()(
   persist(
@@ -55,7 +54,7 @@ export const useBoardStore = create<BoardState>()(
       ],
 
       fetchBoards: async () => {
-        const token = useAuthStore.getState().token;
+        const token = useAuthStore.getState().token ?? undefined;
         const res = await api.get('/boards', token);
         if (Array.isArray(res)) {
           const boards: Record<string, Board> = {};
@@ -65,7 +64,7 @@ export const useBoardStore = create<BoardState>()(
       },
 
       createBoard: async (name: string, description?: string) => {
-        const token = useAuthStore.getState().token;
+        const token = useAuthStore.getState().token ?? undefined;
         const res = await api.post('/boards', { name, description }, token);
         if (res && res.id) {
           set((state) => ({ boards: { ...state.boards, [res.id]: res }, currentBoardId: res.id }));
@@ -75,7 +74,7 @@ export const useBoardStore = create<BoardState>()(
       },
 
       updateBoard: async (id: string, updates: Partial<Board>) => {
-        const token = useAuthStore.getState().token;
+        const token = useAuthStore.getState().token ?? undefined;
         const res = await api.put(`/boards/${id}`, updates, token);
         if (res && res.id) {
           set((state) => ({ boards: { ...state.boards, [id]: res } }));
@@ -83,7 +82,7 @@ export const useBoardStore = create<BoardState>()(
       },
 
       deleteBoard: async (id: string) => {
-        const token = useAuthStore.getState().token;
+        const token = useAuthStore.getState().token ?? undefined;
         await api.delete(`/boards/${id}`, token);
         set((state) => {
           const { [id]: deleted, ...remaining } = state.boards;
@@ -97,7 +96,7 @@ export const useBoardStore = create<BoardState>()(
 
       // Column actions
       createColumn: async (boardId: string, name: string) => {
-        const token = useAuthStore.getState().token;
+        const token = useAuthStore.getState().token ?? undefined;
         const res = await api.post(`/boards/${boardId}/columns`, { name }, token);
         if (res && res.id) {
           set((state) => ({ boards: { ...state.boards, [boardId]: res } }));
@@ -108,7 +107,7 @@ export const useBoardStore = create<BoardState>()(
       },
 
       updateColumn: async (boardId: string, columnId: string, updates: Partial<Column>) => {
-        const token = useAuthStore.getState().token;
+        const token = useAuthStore.getState().token ?? undefined;
         const res = await api.put(`/boards/${boardId}/columns/${columnId}`, updates, token);
         if (res && res.id) {
           set((state) => ({ boards: { ...state.boards, [boardId]: res } }));
@@ -116,7 +115,7 @@ export const useBoardStore = create<BoardState>()(
       },
 
       deleteColumn: async (boardId: string, columnId: string) => {
-        const token = useAuthStore.getState().token;
+        const token = useAuthStore.getState().token ?? undefined;
         const res = await api.delete(`/boards/${boardId}/columns/${columnId}`, token);
         if (res && res.id) {
           set((state) => ({ boards: { ...state.boards, [boardId]: res } }));
@@ -124,7 +123,7 @@ export const useBoardStore = create<BoardState>()(
       },
 
       reorderColumns: async (boardId: string, columnIds: string[]) => {
-        const token = useAuthStore.getState().token;
+        const token = useAuthStore.getState().token ?? undefined;
         const res = await api.post(`/boards/${boardId}/columns/reorder`, { columnIds }, token);
         if (res && res.id) {
           set((state) => ({ boards: { ...state.boards, [boardId]: res } }));
@@ -133,7 +132,7 @@ export const useBoardStore = create<BoardState>()(
 
       // Task actions
       createTask: async (boardId: string, columnId: string, task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
-        const token = useAuthStore.getState().token;
+        const token = useAuthStore.getState().token ?? undefined;
         const res = await api.post(`/boards/${boardId}/columns/${columnId}/tasks`, task, token);
         if (res && res.id) {
           set((state) => ({ boards: { ...state.boards, [boardId]: res } }));
@@ -144,7 +143,7 @@ export const useBoardStore = create<BoardState>()(
       },
 
       updateTask: async (boardId: string, taskId: string, updates: Partial<Task>) => {
-        const token = useAuthStore.getState().token;
+        const token = useAuthStore.getState().token ?? undefined;
         const res = await api.put(`/boards/${boardId}/tasks/${taskId}`, updates, token);
         if (res && res.id) {
           set((state) => ({ boards: { ...state.boards, [boardId]: res } }));
@@ -152,7 +151,7 @@ export const useBoardStore = create<BoardState>()(
       },
 
       deleteTask: async (boardId: string, taskId: string) => {
-        const token = useAuthStore.getState().token;
+        const token = useAuthStore.getState().token ?? undefined;
         const res = await api.delete(`/boards/${boardId}/tasks/${taskId}`, token);
         if (res && res.id) {
           set((state) => ({ boards: { ...state.boards, [boardId]: res } }));
@@ -160,7 +159,7 @@ export const useBoardStore = create<BoardState>()(
       },
 
       reorderTasks: async (boardId: string, columnId: string, taskIds: string[]) => {
-        const token = useAuthStore.getState().token;
+        const token = useAuthStore.getState().token ?? undefined;
         const res = await api.post(`/boards/${boardId}/columns/${columnId}/tasks/reorder`, { taskIds }, token);
         if (res && res.id) {
           set((state) => ({ boards: { ...state.boards, [boardId]: res } }));

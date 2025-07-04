@@ -15,8 +15,7 @@ interface ColumnProps {
 }
 
 const Column: React.FC<ColumnProps> = ({ column, boardId, children }) => {
-  const { updateColumn, deleteColumn, createTask, getBoard } = useBoardStore();
-  const board = getBoard(boardId);
+  const { updateColumn, deleteColumn, createTask } = useBoardStore();
   const [showEdit, setShowEdit] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
   const [editName, setEditName] = useState(column.name);

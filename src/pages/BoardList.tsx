@@ -2,13 +2,10 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
-  Search, 
-  Filter, 
   Plus, 
   Calendar, 
   Users, 
   Clock,
-  MoreVertical,
   Edit,
   Trash2
 } from 'lucide-react';
@@ -23,7 +20,7 @@ import toast from 'react-hot-toast';
 const BoardList: React.FC = () => {
   const { boards, fetchBoards, createBoard, deleteBoard, updateBoard } = useBoardStore();
   const { user } = useAuthStore();
-  const { searchTerm, setPage, reset } = useSearchStore();
+  const { searchTerm, setPage } = useSearchStore();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingBoard, setEditingBoard] = useState<any>(null);

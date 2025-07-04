@@ -1,4 +1,4 @@
-import { format, isToday, isThisWeek, isThisMonth, isAfter, isBefore, parseISO } from 'date-fns';
+import { format, isToday, isThisWeek, isThisMonth, isBefore, parseISO } from 'date-fns';
 import { Priority, Task, FilterOptions, SortOptions } from '../types';
 
 // Date utilities
@@ -170,7 +170,7 @@ export const debounce = <T extends (...args: any[]) => any>(
   func: T,
   wait: number
 ): ((...args: Parameters<T>) => void) => {
-  let timeout: NodeJS.Timeout;
+  let timeout: ReturnType<typeof setTimeout>;
   return (...args: Parameters<T>) => {
     clearTimeout(timeout);
     timeout = setTimeout(() => func(...args), wait);
