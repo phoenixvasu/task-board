@@ -10,22 +10,37 @@ dotenv.config();
 
 const app = express();
 
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:3000",
-  "https://your-frontend.vercel.app"
+// Utility to parse comma-separated origins from env
+function parseOrigins(origins: string | undefined): string[] {
+  if (!origins) return [];
+  return origins.split(',').map(origin => origin.trim()).filter(Boolean);
+}
+
+const localOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000'
 ];
 
-// Fallback: allow all origins in local development
+let allowedOrigins: string[] = [];
 if (process.env.NODE_ENV !== 'production') {
-  app.use(cors({ origin: true, credentials: true }));
+  // In dev, allow all local origins
+  allowedOrigins = localOrigins;
+  app.use(cors({ origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }, credentials: true }));
 } else {
+  // In production, use CORS_ORIGIN env (comma-separated)
+  allowedOrigins = parseOrigins(process.env.CORS_ORIGIN);
   app.use(cors({
     origin: (origin, callback) => {
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        callback(new Error("Not allowed by CORS"));
+        callback(new Error('Not allowed by CORS'));
       }
     },
     credentials: true
