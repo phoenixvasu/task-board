@@ -7,6 +7,7 @@ import Signup from './pages/Signup';
 import BoardList from './pages/BoardList';
 import BoardDetail from './pages/BoardDetail';
 import Profile from './pages/Profile';
+import InviteAccept from './pages/InviteAccept';
 
 const ProtectedRoute: React.FC = () => {
   const { isAuthenticated } = useAuthStore();
@@ -25,6 +26,7 @@ const App: React.FC = () => {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
+      <Route path="/invite/:token" element={<InviteAccept />} />
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<BoardList />} />
         <Route path="/board/:boardId" element={<BoardDetail />} />

@@ -38,6 +38,16 @@ interface BoardState {
   getTask: (boardId: string, taskId: string) => Task | null;
   getColumn: (boardId: string, columnId: string) => Column | null;
   getUser: (id: string) => { id: string; name: string; email: string; avatar?: string } | null;
+  
+  // Real-time update handlers
+  handleRealTimeTaskUpdate: (boardId: string, taskId: string, task: Task) => void;
+  handleRealTimeTaskMove: (boardId: string, taskId: string, fromColumnId: string, toColumnId: string, newIndex: number) => void;
+  handleRealTimeColumnUpdate: (boardId: string, columnId: string, column: Column) => void;
+  handleRealTimeColumnsReorder: (boardId: string, columnIds: string[]) => void;
+  handleRealTimeTaskAdd: (boardId: string, columnId: string, taskId: string, task: Task) => void;
+  handleRealTimeTaskDelete: (boardId: string, taskId: string) => void;
+  handleRealTimeColumnAdd: (boardId: string, column: Column) => void;
+  handleRealTimeColumnDelete: (boardId: string, columnId: string) => void;
 }
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -210,14 +220,146 @@ export const useBoardStore = create<BoardState>()(
       getUser: (id: string) => {
         return get().users.find((user) => user.id === id) || null;
       },
+
+      // Real-time update handlers
+      handleRealTimeTaskUpdate: (boardId: string, taskId: string, task: Task) => {
+        set((state) => {
+          const board = state.boards[boardId];
+          if (!board) return state;
+          
+          const updatedBoard = {
+            ...board,
+            tasks: { ...board.tasks, [taskId]: task }
+          };
+          
+          return { boards: { ...state.boards, [boardId]: updatedBoard } };
+        });
+      },
+
+      handleRealTimeTaskMove: (boardId: string, taskId: string, fromColumnId: string, toColumnId: string, newIndex: number) => {
+        set((state) => {
+          const board = state.boards[boardId];
+          if (!board) return state;
+          
+          const updatedColumns = board.columns.map(col => {
+            if (col.id === fromColumnId) {
+              return { ...col, taskIds: col.taskIds.filter(id => id !== taskId) };
+            }
+            if (col.id === toColumnId) {
+              const newTaskIds = [...col.taskIds];
+              newTaskIds.splice(newIndex, 0, taskId);
+              return { ...col, taskIds: newTaskIds };
+            }
+            return col;
+          });
+          
+          const updatedBoard = { ...board, columns: updatedColumns };
+          return { boards: { ...state.boards, [boardId]: updatedBoard } };
+        });
+      },
+
+      handleRealTimeColumnUpdate: (boardId: string, columnId: string, column: Column) => {
+        set((state) => {
+          const board = state.boards[boardId];
+          if (!board) return state;
+          
+          const updatedColumns = board.columns.map(col => 
+            col.id === columnId ? column : col
+          );
+          
+          const updatedBoard = { ...board, columns: updatedColumns };
+          return { boards: { ...state.boards, [boardId]: updatedBoard } };
+        });
+      },
+
+      handleRealTimeColumnsReorder: (boardId: string, columnIds: string[]) => {
+        set((state) => {
+          const board = state.boards[boardId];
+          if (!board) return state;
+          
+          const columnMap = new Map(board.columns.map(col => [col.id, col]));
+          const reorderedColumns = columnIds.map(id => columnMap.get(id)).filter(Boolean) as Column[];
+          
+          const updatedBoard = { ...board, columns: reorderedColumns };
+          return { boards: { ...state.boards, [boardId]: updatedBoard } };
+        });
+      },
+
+      handleRealTimeTaskAdd: (boardId: string, columnId: string, taskId: string, task: Task) => {
+        set((state) => {
+          const board = state.boards[boardId];
+          if (!board) return state;
+          
+          const updatedColumns = board.columns.map(col => 
+            col.id === columnId 
+              ? { ...col, taskIds: [...col.taskIds, taskId] }
+              : col
+          );
+          
+          const updatedBoard = {
+            ...board,
+            columns: updatedColumns,
+            tasks: { ...board.tasks, [taskId]: task }
+          };
+          
+          return { boards: { ...state.boards, [boardId]: updatedBoard } };
+        });
+      },
+
+      handleRealTimeTaskDelete: (boardId: string, taskId: string) => {
+        set((state) => {
+          const board = state.boards[boardId];
+          if (!board) return state;
+          
+          const updatedColumns = board.columns.map(col => ({
+            ...col,
+            taskIds: col.taskIds.filter(id => id !== taskId)
+          }));
+          
+          const updatedTasks = { ...board.tasks };
+          delete updatedTasks[taskId];
+          
+          const updatedBoard = {
+            ...board,
+            columns: updatedColumns,
+            tasks: updatedTasks
+          };
+          
+          return { boards: { ...state.boards, [boardId]: updatedBoard } };
+        });
+      },
+
+      handleRealTimeColumnAdd: (boardId: string, column: Column) => {
+        set((state) => {
+          const board = state.boards[boardId];
+          if (!board) return state;
+          
+          const updatedBoard = {
+            ...board,
+            columns: [...board.columns, column]
+          };
+          
+          return { boards: { ...state.boards, [boardId]: updatedBoard } };
+        });
+      },
+
+      handleRealTimeColumnDelete: (boardId: string, columnId: string) => {
+        set((state) => {
+          const board = state.boards[boardId];
+          if (!board) return state;
+          
+          const updatedBoard = {
+            ...board,
+            columns: board.columns.filter(col => col.id !== columnId)
+          };
+          
+          return { boards: { ...state.boards, [boardId]: updatedBoard } };
+        });
+      }
     }),
     {
       name: 'board-storage',
-      partialize: (state) => ({
-        boards: state.boards,
-        currentBoardId: state.currentBoardId,
-        users: state.users,
-      }),
+      partialize: (state) => ({ boards: state.boards, users: state.users }),
     }
   )
 ); 

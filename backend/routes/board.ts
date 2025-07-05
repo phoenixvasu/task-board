@@ -3,6 +3,8 @@ import Board from '../models/Board.js';
 import User from '../models/User.js';
 import auth from '../middleware/auth.js';
 import { v4 as uuidv4 } from 'uuid';
+import { io } from '../index.js';
+import SharingService from '../services/sharingService.js';
 
 const router = express.Router();
 
@@ -16,11 +18,31 @@ const asyncHandler = (fn: Function) => (req: any, res: any, next: any) =>
 // All routes below require authentication
 router.use(auth);
 
-// Get all boards for a user
+// Get all boards for a user (including shared boards)
 router.get('/', asyncHandler(async (req: express.Request, res: express.Response) => {
   const userId = (req as any).user.id;
-  const boards = await Board.find({ createdBy: userId });
-  res.json(boards);
+  
+  // Get boards created by user
+  const ownedBoards = await Board.find({ createdBy: userId });
+  
+  // Get boards shared with user
+  const sharedBoards = await SharingService.getSharedBoards(userId);
+  
+  // Combine and format results
+  const allBoards = [
+    ...ownedBoards.map(board => ({
+      ...board.toObject(),
+      userRole: 'owner',
+      isOwner: true
+    })),
+    ...sharedBoards.map(shared => ({
+      boardId: shared.boardId,
+      userRole: shared.role,
+      isOwner: false
+    }))
+  ];
+  
+  res.json(allBoards);
 }));
 
 // Create board
@@ -59,47 +81,116 @@ router.post('/', asyncHandler(async (req: express.Request, res: express.Response
     columns,
     tasks: {},
     createdBy: userId,
+    isPublic: false,
+    members: [],
+    inviteLinks: [],
+    settings: {
+      allowGuestAccess: false,
+      requireApproval: false,
+      defaultRole: "viewer"
+    },
     createdAt: timestamp,
     updatedAt: timestamp,
   });
   res.status(201).json(board);
 }));
 
-// Get board by id
+// Get board by id (with access control)
 router.get('/:id', asyncHandler(async (req: express.Request, res: express.Response) => {
-  const board = await Board.findOne({ id: req.params.id });
-  if (!board || board.createdBy.toString() !== (req as any).user.id) {
+  const { id } = req.params;
+  const userId = (req as any).user.id;
+
+  // Check access permissions
+  const access = await SharingService.checkBoardAccess(id, userId);
+  if (!access.hasAccess) {
+    return res.status(403).json({ message: 'Access denied' });
+  }
+
+  const board = await Board.findOne({ id });
+  if (!board) {
     return res.status(404).json({ message: 'Board not found' });
   }
-  res.json(board);
+
+  // Add user role to response
+  const response = board.toObject();
+  response.userRole = access.role;
+  response.permissions = access.permissions;
+
+  res.json(response);
 }));
 
-// Update board
+// Update board (with access control)
 router.put('/:id', asyncHandler(async (req: express.Request, res: express.Response) => {
-  const board = await Board.findOne({ id: req.params.id });
-  if (!board || board.createdBy.toString() !== (req as any).user.id) {
+  const { id } = req.params;
+  const userId = (req as any).user.id;
+
+  // Check if user can edit
+  const canEdit = await SharingService.canPerformAction(id, userId, 'canEdit');
+  if (!canEdit) {
+    return res.status(403).json({ message: 'You do not have permission to edit this board' });
+  }
+
+  const board = await Board.findOne({ id });
+  if (!board) {
     return res.status(404).json({ message: 'Board not found' });
   }
+
   Object.assign(board, req.body, { updatedAt: getCurrentTimestamp() });
   await board.save();
+  
+  // Emit socket event for real-time updates
+  io.to(id).emit('board-updated', {
+    boardId: id,
+    board: board.toObject(),
+    updatedBy: (req as any).user.username,
+    timestamp: new Date().toISOString()
+  });
+  
   res.json(board);
 }));
 
-// Delete board
+// Delete board (with access control)
 router.delete('/:id', asyncHandler(async (req: express.Request, res: express.Response) => {
-  const board = await Board.findOne({ id: req.params.id });
-  if (!board || board.createdBy.toString() !== (req as any).user.id) {
+  const { id } = req.params;
+  const userId = (req as any).user.id;
+
+  // Check if user can delete
+  const canDelete = await SharingService.canPerformAction(id, userId, 'canDelete');
+  if (!canDelete) {
+    return res.status(403).json({ message: 'You do not have permission to delete this board' });
+  }
+
+  const board = await Board.findOne({ id });
+  if (!board) {
     return res.status(404).json({ message: 'Board not found' });
   }
+
   await board.deleteOne();
+  
+  // Emit socket event for real-time updates
+  io.to(id).emit('board-deleted', {
+    boardId: id,
+    deletedBy: (req as any).user.username,
+    timestamp: new Date().toISOString()
+  });
+  
   res.json({ message: 'Board deleted' });
 }));
 
 // --- COLUMN ENDPOINTS ---
 
-// Add column
+// Add column (with access control)
 router.post('/:boardId/columns', asyncHandler(async (req: express.Request, res: express.Response) => {
   const { name } = req.body;
+  const { boardId } = req.params;
+  const userId = (req as any).user.id;
+
+  // Check if user can edit
+  const canEdit = await SharingService.canPerformAction(boardId, userId, 'canEdit');
+  if (!canEdit) {
+    return res.status(403).json({ message: 'You do not have permission to edit this board' });
+  }
+
   const timestamp = getCurrentTimestamp();
   const column = {
     id: uuidv4(),
@@ -108,22 +199,40 @@ router.post('/:boardId/columns', asyncHandler(async (req: express.Request, res: 
     createdAt: timestamp,
     updatedAt: timestamp,
   };
-  const board = await Board.findOne({ id: req.params.boardId });
-  if (!board || board.createdBy.toString() !== (req as any).user.id) {
+  const board = await Board.findOne({ id: boardId });
+  if (!board) {
     return res.status(404).json({ message: 'Board not found' });
   }
   board.columns.push(column);
   board.updatedAt = timestamp;
   await board.save();
+  
+  // Emit socket event for real-time updates
+  io.to(boardId).emit('column-added', {
+    boardId,
+    column,
+    addedBy: (req as any).user.username,
+    timestamp: new Date().toISOString()
+  });
+  
   res.status(201).json(board);
 }));
 
-// Update column
+// Update column (with access control)
 router.put('/:boardId/columns/:columnId', asyncHandler(async (req: express.Request, res: express.Response) => {
   const { name, taskIds } = req.body;
+  const { boardId } = req.params;
+  const userId = (req as any).user.id;
+
+  // Check if user can edit
+  const canEdit = await SharingService.canPerformAction(boardId, userId, 'canEdit');
+  if (!canEdit) {
+    return res.status(403).json({ message: 'You do not have permission to edit this board' });
+  }
+
   const timestamp = getCurrentTimestamp();
-  const board = await Board.findOne({ id: req.params.boardId });
-  if (!board || board.createdBy.toString() !== (req as any).user.id) {
+  const board = await Board.findOne({ id: boardId });
+  if (!board) {
     return res.status(404).json({ message: 'Board not found' });
   }
   const column = board.columns.find((col: any) => col.id === req.params.columnId);
@@ -133,40 +242,95 @@ router.put('/:boardId/columns/:columnId', asyncHandler(async (req: express.Reque
   column.updatedAt = timestamp;
   board.updatedAt = timestamp;
   await board.save();
+  
+  // Emit socket event for real-time updates
+  io.to(boardId).emit('column-updated', {
+    boardId,
+    columnId: req.params.columnId,
+    column,
+    updatedBy: (req as any).user.username,
+    timestamp: new Date().toISOString()
+  });
+  
   res.json(board);
 }));
 
-// Delete column
+// Delete column (with access control)
 router.delete('/:boardId/columns/:columnId', asyncHandler(async (req: express.Request, res: express.Response) => {
-  const board = await Board.findOne({ id: req.params.boardId });
-  if (!board || board.createdBy.toString() !== (req as any).user.id) {
+  const { boardId } = req.params;
+  const userId = (req as any).user.id;
+
+  // Check if user can edit
+  const canEdit = await SharingService.canPerformAction(boardId, userId, 'canEdit');
+  if (!canEdit) {
+    return res.status(403).json({ message: 'You do not have permission to edit this board' });
+  }
+
+  const board = await Board.findOne({ id: boardId });
+  if (!board) {
     return res.status(404).json({ message: 'Board not found' });
   }
   board.columns = board.columns.filter((col: any) => col.id !== req.params.columnId);
   board.updatedAt = getCurrentTimestamp();
   await board.save();
+  
+  // Emit socket event for real-time updates
+  io.to(boardId).emit('column-deleted', {
+    boardId,
+    columnId: req.params.columnId,
+    deletedBy: (req as any).user.username,
+    timestamp: new Date().toISOString()
+  });
+  
   res.json(board);
 }));
 
-// Reorder columns
+// Reorder columns (with access control)
 router.post('/:boardId/columns/reorder', asyncHandler(async (req: express.Request, res: express.Response) => {
   const { columnIds } = req.body;
-  const board = await Board.findOne({ id: req.params.boardId });
-  if (!board || board.createdBy.toString() !== (req as any).user.id) {
+  const { boardId } = req.params;
+  const userId = (req as any).user.id;
+
+  // Check if user can edit
+  const canEdit = await SharingService.canPerformAction(boardId, userId, 'canEdit');
+  if (!canEdit) {
+    return res.status(403).json({ message: 'You do not have permission to edit this board' });
+  }
+
+  const board = await Board.findOne({ id: boardId });
+  if (!board) {
     return res.status(404).json({ message: 'Board not found' });
   }
   const columnMap = new Map(board.columns.map((col: any) => [col.id, col]));
   board.columns = columnIds.map((id: string) => columnMap.get(id)).filter(Boolean);
   board.updatedAt = getCurrentTimestamp();
   await board.save();
+  
+  // Emit socket event for real-time updates
+  io.to(boardId).emit('columns-reordered', {
+    boardId,
+    columnIds,
+    reorderedBy: (req as any).user.username,
+    timestamp: new Date().toISOString()
+  });
+  
   res.json(board);
 }));
 
 // --- TASK ENDPOINTS ---
 
-// Add task
+// Add task (with access control)
 router.post('/:boardId/columns/:columnId/tasks', asyncHandler(async (req: express.Request, res: express.Response) => {
   const { title, description, createdBy, assignedTo, priority, dueDate } = req.body;
+  const { boardId } = req.params;
+  const userId = (req as any).user.id;
+
+  // Check if user can edit
+  const canEdit = await SharingService.canPerformAction(boardId, userId, 'canEdit');
+  if (!canEdit) {
+    return res.status(403).json({ message: 'You do not have permission to edit this board' });
+  }
+
   const timestamp = getCurrentTimestamp();
   const taskId = uuidv4();
   const task = {
@@ -180,8 +344,8 @@ router.post('/:boardId/columns/:columnId/tasks', asyncHandler(async (req: expres
     createdAt: timestamp,
     updatedAt: timestamp,
   };
-  const board = await Board.findOne({ id: req.params.boardId });
-  if (!board || board.createdBy.toString() !== (req as any).user.id) {
+  const board = await Board.findOne({ id: boardId });
+  if (!board) {
     return res.status(404).json({ message: 'Board not found' });
   }
   board.tasks.set(taskId, task);
@@ -191,13 +355,33 @@ router.post('/:boardId/columns/:columnId/tasks', asyncHandler(async (req: expres
   column.updatedAt = timestamp;
   board.updatedAt = timestamp;
   await board.save();
+  
+  // Emit socket event for real-time updates
+  io.to(boardId).emit('task-added', {
+    boardId,
+    columnId: req.params.columnId,
+    taskId,
+    task,
+    addedBy: (req as any).user.username,
+    timestamp: new Date().toISOString()
+  });
+  
   res.status(201).json(board);
 }));
 
-// Update task
+// Update task (with access control)
 router.put('/:boardId/tasks/:taskId', asyncHandler(async (req: express.Request, res: express.Response) => {
-  const board = await Board.findOne({ id: req.params.boardId });
-  if (!board || board.createdBy.toString() !== (req as any).user.id) {
+  const { boardId } = req.params;
+  const userId = (req as any).user.id;
+
+  // Check if user can edit
+  const canEdit = await SharingService.canPerformAction(boardId, userId, 'canEdit');
+  if (!canEdit) {
+    return res.status(403).json({ message: 'You do not have permission to edit this board' });
+  }
+
+  const board = await Board.findOne({ id: boardId });
+  if (!board) {
     return res.status(404).json({ message: 'Board not found' });
   }
   const task = board.tasks.get(req.params.taskId);
@@ -206,13 +390,32 @@ router.put('/:boardId/tasks/:taskId', asyncHandler(async (req: express.Request, 
   board.tasks.set(req.params.taskId, task);
   board.updatedAt = getCurrentTimestamp();
   await board.save();
+  
+  // Emit socket event for real-time updates
+  io.to(boardId).emit('task-updated', {
+    boardId,
+    taskId: req.params.taskId,
+    task,
+    updatedBy: (req as any).user.username,
+    timestamp: new Date().toISOString()
+  });
+  
   res.json(board);
 }));
 
-// Delete task
+// Delete task (with access control)
 router.delete('/:boardId/tasks/:taskId', asyncHandler(async (req: express.Request, res: express.Response) => {
-  const board = await Board.findOne({ id: req.params.boardId });
-  if (!board || board.createdBy.toString() !== (req as any).user.id) {
+  const { boardId } = req.params;
+  const userId = (req as any).user.id;
+
+  // Check if user can edit
+  const canEdit = await SharingService.canPerformAction(boardId, userId, 'canEdit');
+  if (!canEdit) {
+    return res.status(403).json({ message: 'You do not have permission to edit this board' });
+  }
+
+  const board = await Board.findOne({ id: boardId });
+  if (!board) {
     return res.status(404).json({ message: 'Board not found' });
   }
   board.tasks.delete(req.params.taskId);
@@ -221,14 +424,32 @@ router.delete('/:boardId/tasks/:taskId', asyncHandler(async (req: express.Reques
   });
   board.updatedAt = getCurrentTimestamp();
   await board.save();
+  
+  // Emit socket event for real-time updates
+  io.to(boardId).emit('task-deleted', {
+    boardId,
+    taskId: req.params.taskId,
+    deletedBy: (req as any).user.username,
+    timestamp: new Date().toISOString()
+  });
+  
   res.json(board);
 }));
 
-// Move/reorder tasks in a column
+// Move/reorder tasks in a column (with access control)
 router.post('/:boardId/columns/:columnId/tasks/reorder', asyncHandler(async (req: express.Request, res: express.Response) => {
   const { taskIds } = req.body;
-  const board = await Board.findOne({ id: req.params.boardId });
-  if (!board || board.createdBy.toString() !== (req as any).user.id) {
+  const { boardId } = req.params;
+  const userId = (req as any).user.id;
+
+  // Check if user can edit
+  const canEdit = await SharingService.canPerformAction(boardId, userId, 'canEdit');
+  if (!canEdit) {
+    return res.status(403).json({ message: 'You do not have permission to edit this board' });
+  }
+
+  const board = await Board.findOne({ id: boardId });
+  if (!board) {
     return res.status(404).json({ message: 'Board not found' });
   }
   const column = board.columns.find((col: any) => col.id === req.params.columnId);
@@ -237,6 +458,16 @@ router.post('/:boardId/columns/:columnId/tasks/reorder', asyncHandler(async (req
   column.updatedAt = getCurrentTimestamp();
   board.updatedAt = getCurrentTimestamp();
   await board.save();
+  
+  // Emit socket event for real-time updates
+  io.to(boardId).emit('tasks-reordered', {
+    boardId,
+    columnId: req.params.columnId,
+    taskIds,
+    reorderedBy: (req as any).user.username,
+    timestamp: new Date().toISOString()
+  });
+  
   res.json(board);
 }));
 

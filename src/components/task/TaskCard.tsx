@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useBoardStore } from '../../store/useBoardStore';
 import { useDraggable } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
@@ -8,6 +8,8 @@ import Modal from '../ui/Modal';
 import Dropdown from '../ui/Dropdown';
 import Button from '../ui/Button';
 import ReactMarkdown from 'react-markdown';
+import EditingIndicator from '../collaboration/EditingIndicator';
+import { socketService } from '../../api/socket';
 import { getPriorityColor, formatDate } from '../../utils';
 import toast from 'react-hot-toast';
 
@@ -26,6 +28,15 @@ const TaskCard: React.FC<TaskCardProps> = ({ taskId, boardId }) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: taskId });
+
+  // Notify other users when editing starts/stops
+  useEffect(() => {
+    if (showEdit) {
+      socketService.notifyUserEditing(taskId, true);
+    } else {
+      socketService.notifyUserEditing(taskId, false);
+    }
+  }, [showEdit, taskId]);
 
   if (!task || !editTask) return null;
 
@@ -62,6 +73,9 @@ const TaskCard: React.FC<TaskCardProps> = ({ taskId, boardId }) => {
       layout
       className={`bg-white dark:bg-secondary rounded-lg p-3 shadow flex flex-col gap-2 border-l-4 ${getPriorityColor(task.priority)} dark:text-white`}
     >
+      {/* Editing indicator */}
+      <EditingIndicator taskId={taskId} />
+      
       <div className="flex items-center justify-between gap-2">
         <h3 className="font-semibold text-base truncate">{task.title}</h3>
         <div className="flex gap-1">

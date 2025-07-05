@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent, DragOverlay, useDroppable, useDraggable } from '@dnd-kit/core';
 import { arrayMove, SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { useBoardStore } from '../../store/useBoardStore';
+import { socketService } from '../../api/socket';
 import Column from '../column/Column';
 import TaskCard from '../task/TaskCard';
 import Button from '../ui/Button';
@@ -53,6 +54,10 @@ const BoardColumns: React.FC<BoardColumnsProps> = ({ boardId, search = '' }) => 
         const newOrder = arrayMove(board.columns.map((col) => col.id), oldIndex, newIndex);
         setIsLoading(true);
         await reorderColumns(boardId, newOrder);
+        
+        // Emit socket event for real-time updates
+        socketService.emitColumnsReordered(newOrder);
+        
         setIsLoading(false);
         toast.success('Columns reordered');
       }
@@ -86,7 +91,9 @@ const BoardColumns: React.FC<BoardColumnsProps> = ({ boardId, search = '' }) => 
       }
     } else {
       // Move to another column
-      toast.success('Task moved (implement moveTask logic)');
+      // Emit socket event for real-time updates
+      socketService.emitTaskMoved(active.id as string, fromColumnId, toColumnId, newIndex);
+      toast.success('Task moved');
     }
     setIsLoading(false);
   };
