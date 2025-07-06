@@ -557,4 +557,3 @@ For support and questions:
 
 **Built with ❤️ using React, Node.js, and Socket.IO**
 
-_Last updated: December 2024_
