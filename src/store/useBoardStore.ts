@@ -157,9 +157,9 @@ export const useBoardStore = create<BoardState>()(
         const token = localStorage.getItem('jwt');
         await api.delete(`/boards/${boardId}/columns/${columnId}`, token || undefined);
         set(state => ({
-          boards: {
+            boards: {
             ...state.boards,
-            [boardId]: {
+              [boardId]: {
               ...state.boards[boardId],
               columns: state.boards[boardId].columns.filter(col => col.id !== columnId)
             }
@@ -171,9 +171,9 @@ export const useBoardStore = create<BoardState>()(
         const token = localStorage.getItem('jwt');
         const res = await api.post(`/boards/${boardId}/columns/reorder`, { columnIds }, token || undefined);
         set(state => ({
-          boards: {
-            ...state.boards,
-            [boardId]: {
+            boards: {
+              ...state.boards,
+              [boardId]: {
               ...state.boards[boardId],
               columns: res
             }
@@ -240,9 +240,9 @@ export const useBoardStore = create<BoardState>()(
         const token = localStorage.getItem('jwt');
         const res = await api.post(`/boards/${boardId}/tasks/${taskId}/move`, { fromColumnId, toColumnId, newIndex }, token || undefined);
         set(state => ({
-          boards: {
-            ...state.boards,
-            [boardId]: {
+            boards: {
+              ...state.boards,
+              [boardId]: {
               ...state.boards[boardId],
               columns: res.columns,
               tasks: { ...state.boards[boardId].tasks, [taskId]: res.task }

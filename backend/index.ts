@@ -1,4 +1,4 @@
-process.on('uncaughtException', err => {
+process.on('uncaughtException', (err: Error) => {
   console.error('‼️ Uncaught Exception:', err);
   process.exit(1);
 });
@@ -91,7 +91,7 @@ io.use(async (socket: Socket, next: (err?: Error) => void) => {
 // Socket.io connection handler
 io.on('connection', (socket: Socket) => {
   // Join board room
-  socket.on('join-board', (data: any) => {
+  socket.on('join-board', (data: { boardId: string }) => {
     const { boardId } = data;
     socket.join(boardId);
     socket.data.currentBoardId = boardId;
@@ -244,7 +244,7 @@ io.on('connection', (socket: Socket) => {
     }
   });
 
-  socket.on('leave-board', (data: any) => {
+  socket.on('leave-board', (data: { boardId: string }) => {
     const { boardId } = data;
     socket.leave(boardId);
     socket.data.currentBoardId = null;
@@ -276,7 +276,7 @@ if (process.env.NODE_ENV !== 'production') {
   // In dev, allow all local origins
   allowedOrigins = localOrigins;
   app.use(cors({ 
-    origin: (origin, callback) => {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
@@ -291,7 +291,7 @@ if (process.env.NODE_ENV !== 'production') {
   // In production, use CORS_ORIGIN env (comma-separated)
   allowedOrigins = parseOrigins(process.env.CORS_ORIGIN);
   app.use(cors({
-    origin: (origin, callback) => {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
