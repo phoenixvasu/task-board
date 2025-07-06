@@ -3,30 +3,71 @@ import { Priority, Task, FilterOptions, SortOptions } from '../types';
 
 // Date utilities
 export const formatDate = (date: string) => {
-  return format(new Date(date), 'MMM dd, yyyy');
+  if (!date) return 'N/A';
+  try {
+    const parsedDate = new Date(date);
+    if (isNaN(parsedDate.getTime())) return 'N/A';
+    return format(parsedDate, 'MMM dd, yyyy');
+  } catch (error) {
+    return 'N/A';
+  }
 };
 
 export const formatDateTime = (date: string) => {
-  return format(new Date(date), 'MMM dd, yyyy HH:mm');
+  if (!date) return 'N/A';
+  try {
+    const parsedDate = new Date(date);
+    if (isNaN(parsedDate.getTime())) return 'N/A';
+    return format(parsedDate, 'MMM dd, yyyy HH:mm');
+  } catch (error) {
+    return 'N/A';
+  }
 };
 
 export const isTaskOverdue = (dueDate: string) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0); // Set to start of day
-  const due = parseISO(dueDate);
-  return isBefore(due, today);
+  if (!dueDate) return false;
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Set to start of day
+    const due = parseISO(dueDate);
+    if (isNaN(due.getTime())) return false;
+    return isBefore(due, today);
+  } catch (error) {
+    return false;
+  }
 };
 
 export const isTaskDueToday = (dueDate: string) => {
-  return isToday(new Date(dueDate));
+  if (!dueDate) return false;
+  try {
+    const parsedDate = new Date(dueDate);
+    if (isNaN(parsedDate.getTime())) return false;
+    return isToday(parsedDate);
+  } catch (error) {
+    return false;
+  }
 };
 
 export const isTaskDueThisWeek = (dueDate: string) => {
-  return isThisWeek(new Date(dueDate));
+  if (!dueDate) return false;
+  try {
+    const parsedDate = new Date(dueDate);
+    if (isNaN(parsedDate.getTime())) return false;
+    return isThisWeek(parsedDate);
+  } catch (error) {
+    return false;
+  }
 };
 
 export const isTaskDueThisMonth = (dueDate: string) => {
-  return isThisMonth(new Date(dueDate));
+  if (!dueDate) return false;
+  try {
+    const parsedDate = new Date(dueDate);
+    if (isNaN(parsedDate.getTime())) return false;
+    return isThisMonth(parsedDate);
+  } catch (error) {
+    return false;
+  }
 };
 
 // Priority utilities
@@ -92,8 +133,8 @@ export const filterTasks = (tasks: Task[], filters: FilterOptions) => {
       const searchLower = filters.search.toLowerCase();
       const matchesTitle = task.title.toLowerCase().includes(searchLower);
       const matchesDescription = task.description.toLowerCase().includes(searchLower);
-      const matchesCreatedBy = task.createdBy.toLowerCase().includes(searchLower);
-      const matchesAssignedTo = task.assignedTo.toLowerCase().includes(searchLower);
+      const matchesCreatedBy = task.createdBy?.toLowerCase().includes(searchLower) || false;
+      const matchesAssignedTo = task.assignedTo?.toLowerCase().includes(searchLower) || false;
       
       if (!matchesTitle && !matchesDescription && !matchesCreatedBy && !matchesAssignedTo) {
         return false;
@@ -106,38 +147,68 @@ export const filterTasks = (tasks: Task[], filters: FilterOptions) => {
 
 // Sort utilities
 export const sortTasks = (tasks: Task[], sortOptions: SortOptions) => {
-  return [...tasks].sort((a, b) => {
+  const sortedTasks = [...tasks].sort((a, b) => {
     let aValue: any;
     let bValue: any;
 
     switch (sortOptions.field) {
       case 'priority':
         const priorityOrder = { high: 3, medium: 2, low: 1 };
-        aValue = priorityOrder[a.priority];
-        bValue = priorityOrder[b.priority];
+        aValue = priorityOrder[a.priority] || 0;
+        bValue = priorityOrder[b.priority] || 0;
         break;
       case 'dueDate':
-        aValue = new Date(a.dueDate).getTime();
-        bValue = new Date(b.dueDate).getTime();
+        // Handle null/empty due dates by putting them at the end
+        if (!a.dueDate || a.dueDate.trim() === '') {
+          aValue = Number.MAX_SAFE_INTEGER;
+        } else {
+          aValue = new Date(a.dueDate).getTime();
+          if (isNaN(aValue)) aValue = Number.MAX_SAFE_INTEGER;
+        }
+        if (!b.dueDate || b.dueDate.trim() === '') {
+          bValue = Number.MAX_SAFE_INTEGER;
+        } else {
+          bValue = new Date(b.dueDate).getTime();
+          if (isNaN(bValue)) bValue = Number.MAX_SAFE_INTEGER;
+        }
         break;
       case 'createdAt':
-        aValue = new Date(a.createdAt).getTime();
-        bValue = new Date(b.createdAt).getTime();
+        // Handle null/empty created dates
+        if (!a.createdAt || a.createdAt.trim() === '') {
+          aValue = 0;
+        } else {
+          aValue = new Date(a.createdAt).getTime();
+          if (isNaN(aValue)) aValue = 0;
+        }
+        if (!b.createdAt || b.createdAt.trim() === '') {
+          bValue = 0;
+        } else {
+          bValue = new Date(b.createdAt).getTime();
+          if (isNaN(bValue)) bValue = 0;
+        }
         break;
       case 'title':
-        aValue = a.title.toLowerCase();
-        bValue = b.title.toLowerCase();
+        aValue = (a.title || '').toLowerCase();
+        bValue = (b.title || '').toLowerCase();
         break;
       default:
         return 0;
     }
 
+    // Handle the comparison based on sort direction
     if (sortOptions.direction === 'asc') {
-      return aValue > bValue ? 1 : -1;
+      if (aValue < bValue) return -1;
+      if (aValue > bValue) return 1;
+      return 0;
     } else {
-      return aValue < bValue ? 1 : -1;
+      // Descending
+      if (aValue > bValue) return -1;
+      if (aValue < bValue) return 1;
+      return 0;
     }
   });
+
+  return sortedTasks;
 };
 
 // Generate initials from name

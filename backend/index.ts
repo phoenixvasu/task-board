@@ -1,3 +1,13 @@
+process.on('uncaughtException', err => {
+  console.error('‼️ Uncaught Exception:', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason: any) => {
+  console.error('‼️ Unhandled Rejection:', reason);
+  process.exit(1);
+});
+
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import mongoose from "mongoose";
@@ -18,11 +28,14 @@ const server = createServer(app);
 // Socket.io setup with CORS
 const io = new Server(server, {
   cors: {
-    origin: process.env.NODE_ENV !== 'production' 
-      ? ["http://localhost:5173", "http://localhost:3000"]
-      : process.env.CORS_ORIGIN?.split(',').map(origin => origin.trim()) || [],
-    credentials: true
-  }
+    origin: process.env.NODE_ENV === 'production'
+      ? process.env.CORS_ORIGIN?.split(',').map(origin => origin.trim()) || []
+      : ["http://localhost:3000"],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+  },
+  transports: ['websocket', 'polling']
 });
 
 // Store active users and their board sessions
@@ -37,7 +50,7 @@ interface ActiveUser {
 const activeUsers = new Map<string, ActiveUser>();
 
 // Socket.io authentication middleware
-io.use((socket, next) => {
+io.use(async (socket, next) => {
   const token = socket.handshake.auth.token;
   if (!token) {
     return next(new Error('Authentication error'));
@@ -45,7 +58,30 @@ io.use((socket, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any;
-    socket.data.user = { id: decoded.id, username: decoded.username };
+    
+    // Convert the ID to ObjectId if it's valid, otherwise use as string
+    let userId: string;
+    try {
+      if (mongoose.Types.ObjectId.isValid(decoded.id)) {
+        userId = new mongoose.Types.ObjectId(decoded.id).toString();
+      } else {
+        userId = decoded.id;
+      }
+    } catch (error) {
+      userId = decoded.id;
+    }
+    
+    // Get user from database to get username
+    const User = mongoose.model('User');
+    const user = await User.findById(userId);
+    if (!user) {
+      return next(new Error('User not found'));
+    }
+    
+    socket.data.user = { 
+      id: userId, 
+      username: user.name 
+    };
     next();
   } catch (err) {
     next(new Error('Authentication error'));
@@ -54,11 +90,11 @@ io.use((socket, next) => {
 
 // Socket.io connection handler
 io.on('connection', (socket) => {
-  console.log(`User connected: ${socket.data.user.username} (${socket.id})`);
-
   // Join board room
-  socket.on('join-board', (boardId: string) => {
+  socket.on('join-board', (data) => {
+    const { boardId } = data;
     socket.join(boardId);
+    socket.data.currentBoardId = boardId;
     
     // Add user to active users
     const activeUser: ActiveUser = {
@@ -69,18 +105,29 @@ io.on('connection', (socket) => {
       lastActivity: new Date()
     };
     activeUsers.set(socket.id, activeUser);
-
-    // Notify others in the board
+    
+    // Notify other users in the room
     socket.to(boardId).emit('user-joined', {
       userId: socket.data.user.id,
       username: socket.data.user.username,
       timestamp: new Date().toISOString()
     });
-
-    // Send current active users to the new user
-    const boardUsers = Array.from(activeUsers.values())
-      .filter(user => user.boardId === boardId && user.socketId !== socket.id);
-    socket.emit('active-users', boardUsers);
+    
+    // Send current active users to the joining user
+    const room = io.sockets.adapter.rooms.get(boardId);
+    if (room) {
+      const activeUsersList: ActiveUser[] = [];
+      room.forEach((socketId) => {
+        const userSocket = io.sockets.sockets.get(socketId);
+        if (userSocket && userSocket.data.user) {
+          const activeUser = activeUsers.get(socketId);
+          if (activeUser) {
+            activeUsersList.push(activeUser);
+          }
+        }
+      });
+      socket.emit('active-users', activeUsersList);
+    }
   });
 
   // User is editing a task
@@ -135,6 +182,44 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Task added
+  socket.on('task-added', (data: { boardId: string; columnId: string; taskId: string; task: any }) => {
+    socket.to(data.boardId).emit('task-added', {
+      columnId: data.columnId,
+      taskId: data.taskId,
+      task: data.task,
+      addedBy: socket.data.user.username,
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  // Task deleted
+  socket.on('task-deleted', (data: { boardId: string; taskId: string }) => {
+    socket.to(data.boardId).emit('task-deleted', {
+      taskId: data.taskId,
+      deletedBy: socket.data.user.username,
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  // Column added
+  socket.on('column-added', (data: { boardId: string; column: any }) => {
+    socket.to(data.boardId).emit('column-added', {
+      column: data.column,
+      addedBy: socket.data.user.username,
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  // Column deleted
+  socket.on('column-deleted', (data: { boardId: string; columnId: string }) => {
+    socket.to(data.boardId).emit('column-deleted', {
+      columnId: data.columnId,
+      deletedBy: socket.data.user.username,
+      timestamp: new Date().toISOString()
+    });
+  });
+
   // User activity (heartbeat)
   socket.on('activity', (boardId: string) => {
     const user = activeUsers.get(socket.id);
@@ -157,7 +242,22 @@ io.on('connection', (socket) => {
       // Remove from active users
       activeUsers.delete(socket.id);
     }
-    console.log(`User disconnected: ${socket.data.user.username} (${socket.id})`);
+  });
+
+  socket.on('leave-board', (data) => {
+    const { boardId } = data;
+    socket.leave(boardId);
+    socket.data.currentBoardId = null;
+    
+    // Remove from active users
+    activeUsers.delete(socket.id);
+    
+    // Notify other users in the room
+    socket.to(boardId).emit('user-left', {
+      userId: socket.data.user.id,
+      username: socket.data.user.username,
+      timestamp: new Date().toISOString()
+    });
   });
 });
 
@@ -168,7 +268,6 @@ function parseOrigins(origins: string | undefined): string[] {
 }
 
 const localOrigins = [
-  'http://localhost:5173',
   'http://localhost:3000'
 ];
 
@@ -176,13 +275,18 @@ let allowedOrigins: string[] = [];
 if (process.env.NODE_ENV !== 'production') {
   // In dev, allow all local origins
   allowedOrigins = localOrigins;
-  app.use(cors({ origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  }, credentials: true }));
+  app.use(cors({ 
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    }, 
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+  }));
 } else {
   // In production, use CORS_ORIGIN env (comma-separated)
   allowedOrigins = parseOrigins(process.env.CORS_ORIGIN);
@@ -194,10 +298,22 @@ if (process.env.NODE_ENV !== 'production') {
         callback(new Error('Not allowed by CORS'));
       }
     },
-    credentials: true
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
   }));
 }
 app.use(express.json());
+
+// Health check endpoint
+app.get("/api/health", (req: Request, res: Response) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
 
 app.use("/api/auth", authRoutes);
 app.use("/api/boards", boardRoutes);
@@ -211,12 +327,27 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 });
 
 const PORT = process.env.PORT || 5000;
+const MONGODB_URI = process.env.MONGODB_URI;
+
+if (!MONGODB_URI) {
+  console.error('MONGODB_URI environment variable is required');
+  process.exit(1);
+}
+
 mongoose
-  .connect(process.env.MONGODB_URI as string)
+  .connect(MONGODB_URI)
   .then(() => {
-    server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    console.log('Connected to MongoDB');
+    server.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`CORS Origins: ${allowedOrigins.join(', ')}`);
+    });
   })
-  .catch((err: Error) => console.error("MongoDB connection error:", err));
+  .catch((err: Error) => {
+    console.error("MongoDB connection error:", err);
+    process.exit(1);
+  });
 
 // Export io for use in routes
 export { io };

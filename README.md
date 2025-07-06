@@ -1,627 +1,560 @@
-# TaskBoard - Full-Stack Kanban Productivity App
+# Task Board Application
 
-A modern, real-time collaborative Kanban board application built with TypeScript, React, Node.js, Express, MongoDB, and Socket.io. Features comprehensive board sharing, role-based access control, real-time collaboration, and a beautiful responsive UI.
+A real-time collaborative task board application built with React, Node.js, and Socket.IO. Features drag-and-drop task management, role-based permissions, and live collaboration across multiple users.
 
-## 🚀 Features
+## ✨ Features
 
-### Core Kanban Functionality
+- **Real-time Collaboration**: Live updates across multiple users with Socket.IO
+- **Task Management**: Create, edit, and organize tasks with drag & drop
+- **Role-based Permissions**: Owner, Editor, and Viewer roles with granular permissions
+- **User Authentication**: Secure JWT-based login and registration system
+- **Board Sharing**: Add members with different permission levels
+- **Search & Filtering**: Advanced task filtering and search capabilities
+- **Responsive Design**: Works seamlessly on desktop and mobile devices
+- **Dark/Light Theme**: Toggle between themes with persistent preferences
+- **Real-time Notifications**: Toast notifications for user actions
+- **Health Monitoring**: Built-in health checks and error handling
 
-- **Drag & Drop Interface**: Intuitive task management with smooth drag-and-drop using @dnd-kit
-- **Board Management**: Create, edit, and delete boards with custom descriptions
-- **Column Management**: Add, reorder, and customize columns for workflow stages
-- **Task Management**: Create, edit, delete tasks with rich metadata
-- **Priority System**: High, medium, low priority levels with visual indicators
-- **Due Date Tracking**: Set and track task deadlines with overdue indicators
-- **Assignment System**: Assign tasks to team members with user avatars
-
-### Real-Time Collaboration
-
-- **Live Updates**: Real-time synchronization across all connected users
-- **User Presence**: See who's currently viewing the board
-- **Editing Indicators**: "User is editing..." indicators for tasks
-- **Activity Feed**: Toast notifications for all collaborative actions
-- **Connection Status**: Real-time connection monitoring
-- **Socket.io Integration**: WebSocket-based real-time communication
-
-### Board Sharing & Access Control
-
-- **Role-Based Permissions**: Owner, Admin, Editor, Viewer roles
-- **Member Management**: Add, remove, and update member roles
-- **Invite Links**: Create secure invite links with role assignment
-- **Public/Private Boards**: Control board visibility and access
-- **Guest Access**: Optional guest access without accounts
-- **JWT Security**: Secure token-based authentication for invites
-
-### User Experience
-
-- **Responsive Design**: Works seamlessly on desktop, tablet, and mobile
-- **Dark/Light Mode**: Toggle between themes with system preference detection
-- **Search Functionality**: Global search across boards and tasks
-- **Filtering & Sorting**: Filter by priority, assignee, due date
-- **Markdown Support**: Rich text descriptions with markdown rendering
-- **Toast Notifications**: User-friendly feedback for all actions
-- **Smooth Animations**: Framer Motion animations for enhanced UX
-
-### Authentication & Security
-
-- **JWT Authentication**: Secure token-based authentication
-- **Password Hashing**: bcrypt password encryption
-- **Protected Routes**: Route protection with authentication middleware
-- **CORS Configuration**: Secure cross-origin resource sharing
-- **Input Validation**: Comprehensive server-side validation
-
-## 🏗️ Architecture
-
-### Frontend (React + TypeScript)
-
-```
-src/
-├── components/          # Reusable UI components
-│   ├── ui/            # Base UI components (Button, Modal, etc.)
-│   ├── board/         # Board-specific components
-│   ├── column/        # Column management components
-│   ├── task/          # Task management components
-│   ├── layout/        # Layout components (Header)
-│   ├── sharing/       # Board sharing components
-│   └── collaboration/ # Real-time collaboration components
-├── pages/             # Page components
-├── store/             # Zustand state management
-├── api/               # API and Socket.io services
-├── types/             # TypeScript type definitions
-├── utils/             # Utility functions
-└── styles/            # CSS and styling
-```
-
-### Backend (Node.js + Express + TypeScript)
-
-```
-backend/
-├── models/            # MongoDB schemas and models
-├── routes/            # Express route handlers
-├── middleware/        # Custom middleware (auth, validation)
-├── services/          # Business logic services
-└── index.ts          # Main server entry point
-```
-
-## 🛠️ Technology Stack
+## 🛠️ Tech Stack
 
 ### Frontend
 
-- **React 18**: Modern React with hooks and functional components
-- **TypeScript**: Type-safe development
-- **Vite**: Fast build tool and development server
-- **Tailwind CSS**: Utility-first CSS framework
-- **Framer Motion**: Smooth animations and transitions
-- **Zustand**: Lightweight state management
-- **React Router**: Client-side routing
-- **Socket.io Client**: Real-time communication
-- **@dnd-kit**: Drag and drop functionality
-- **Lucide React**: Beautiful icon library
-- **React Hot Toast**: Toast notifications
-- **React Markdown**: Markdown rendering
+- **React 18** with TypeScript for type safety
+- **Vite** for fast development and optimized builds
+- **Tailwind CSS** for utility-first styling
+- **Zustand** for lightweight state management
+- **Socket.IO Client** for real-time communication
+- **React Router** for client-side routing
+- **React Hot Toast** for user notifications
+- **Framer Motion** for smooth animations
+- **Lucide React** for beautiful icons
 
 ### Backend
 
-- **Node.js**: JavaScript runtime
-- **Express**: Web framework
-- **TypeScript**: Type-safe development
-- **MongoDB**: NoSQL database
-- **Mongoose**: MongoDB object modeling
-- **Socket.io**: Real-time bidirectional communication
-- **JWT**: JSON Web Token authentication
-- **bcryptjs**: Password hashing
-- **CORS**: Cross-origin resource sharing
-- **UUID**: Unique identifier generation
-
-### Development Tools
-
-- **ESLint**: Code linting
-- **Prettier**: Code formatting
-- **Nodemon**: Development server with auto-restart
-- **ts-node**: TypeScript execution
+- **Node.js** with Express framework
+- **TypeScript** for type safety and better development experience
+- **Socket.IO** for real-time features and WebSocket support
+- **MongoDB** with Mongoose ODM
+- **JWT** for secure authentication
+- **bcryptjs** for password hashing
+- **CORS** enabled for cross-origin requests
+- **dotenv** for environment variable management
 
 ## 📁 Project Structure
 
-### Frontend Structure
-
 ```
-src/
-├── components/
-│   ├── ui/
-│   │   ├── Button.tsx          # Reusable button component
-│   │   ├── Modal.tsx           # Modal dialog component
-│   │   ├── Dropdown.tsx        # Dropdown select component
-│   │   ├── Avatar.tsx          # User avatar component
-│   │   └── Tag.tsx             # Priority/status tags
-│   ├── board/
-│   │   └── BoardColumns.tsx    # Main board layout with drag-drop
-│   ├── column/
-│   │   └── Column.tsx          # Individual column component
-│   ├── task/
-│   │   └── TaskCard.tsx        # Individual task card
-│   ├── layout/
-│   │   └── Header.tsx          # Application header
-│   ├── sharing/
-│   │   └── ShareBoard.tsx      # Board sharing interface
-│   └── collaboration/
-│       ├── ActiveUsers.tsx     # Active users display
-│       ├── ConnectionStatus.tsx # Connection status indicator
-│       └── EditingIndicator.tsx # User editing indicators
-├── pages/
-│   ├── BoardList.tsx           # Board listing page
-│   ├── BoardDetail.tsx         # Individual board view
-│   ├── Login.tsx               # Authentication page
-│   ├── Signup.tsx              # Registration page
-│   ├── Profile.tsx             # User profile page
-│   └── InviteAccept.tsx        # Invite link acceptance
-├── store/
-│   ├── useAuthStore.ts         # Authentication state
-│   ├── useBoardStore.ts        # Board and task state
-│   ├── useSharingStore.ts      # Board sharing state
-│   ├── useCollaborationStore.ts # Real-time collaboration state
-│   └── useSearchStore.ts       # Search functionality state
-├── api/
-│   ├── index.ts                # REST API client
-│   └── socket.ts               # Socket.io client service
-├── types/
-│   └── index.ts                # TypeScript type definitions
-├── utils/
-│   └── index.ts                # Utility functions
-├── App.tsx                     # Main application component
-├── main.tsx                    # Application entry point
-└── index.css                   # Global styles
-```
-
-### Backend Structure
-
-```
-backend/
-├── models/
-│   ├── User.ts                 # User model and schema
-│   └── Board.ts                # Board model with sharing fields
-├── routes/
-│   ├── auth.ts                 # Authentication routes
-│   ├── board.ts                # Board CRUD routes
-│   ├── user.ts                 # User management routes
-│   └── sharing.ts              # Board sharing routes
-├── middleware/
-│   └── auth.ts                 # JWT authentication middleware
-├── services/
-│   └── sharingService.ts       # Board sharing business logic
-├── index.ts                    # Main server with Socket.io
-├── package.json                # Backend dependencies
-└── tsconfig.json               # TypeScript configuration
+task-board/
+├── src/                          # Frontend source code
+│   ├── components/               # React components
+│   │   ├── board/               # Board-related components
+│   │   │   └── BoardColumns.tsx # Board columns container
+│   │   ├── column/              # Column components
+│   │   │   └── Column.tsx       # Individual column component
+│   │   ├── task/                # Task components
+│   │   │   └── TaskCard.tsx     # Task card component
+│   │   ├── layout/              # Layout components
+│   │   │   └── Header.tsx       # Application header
+│   │   └── ui/                  # Reusable UI components
+│   │       ├── Avatar.tsx       # User avatar component
+│   │       ├── Button.tsx       # Button component
+│   │       ├── Dropdown.tsx     # Dropdown component
+│   │       ├── Modal.tsx        # Modal component
+│   │       └── Tag.tsx          # Tag component
+│   ├── pages/                   # Page components
+│   │   ├── BoardList.tsx        # Board listing page
+│   │   ├── BoardDetail.tsx      # Board detail page
+│   │   └── Login.tsx            # Login page
+│   ├── store/                   # State management
+│   │   ├── useAuthStore.ts      # Authentication state
+│   │   └── useBoardStore.ts     # Board state
+│   ├── api/                     # API utilities
+│   │   ├── index.ts             # API client
+│   │   └── socket.ts            # Socket.IO client
+│   ├── types/                   # TypeScript types
+│   │   └── index.ts             # Type definitions
+│   └── utils/                   # Utility functions
+│       └── index.ts             # Utility functions
+├── backend/                     # Backend source code
+│   ├── routes/                  # API routes
+│   │   ├── auth.ts              # Authentication routes
+│   │   ├── board.ts             # Board routes
+│   │   ├── user.ts              # User routes
+│   │   └── sharing.ts           # Sharing routes
+│   ├── models/                  # Database models
+│   │   ├── Board.ts             # Board model
+│   │   └── User.ts              # User model
+│   ├── services/                # Business logic
+│   │   └── sharingService.ts    # Sharing service
+│   ├── middleware/              # Express middleware
+│   │   └── auth.ts              # Authentication middleware
+│   ├── index.ts                 # Main server file
+│   ├── package.json             # Backend dependencies
+│   ├── tsconfig.json            # TypeScript config
+│   └── .env                     # Backend environment variables
+├── public/                      # Static assets
+├── index.html                   # HTML template
+├── package.json                 # Frontend dependencies
+├── vite.config.ts               # Vite configuration
+├── tailwind.config.js           # Tailwind CSS config
+├── tsconfig.json                # TypeScript config
+├── .env                         # Frontend environment variables
+├── vercel.json                  # Vercel deployment config
+└── README.md                    # This file
 ```
 
-## 🔧 Installation & Setup
+## 🚀 Getting Started
 
 ### Prerequisites
 
-- Node.js 18+
-- MongoDB 5+
-- npm or yarn
+- **Node.js** (v18 or higher)
+- **MongoDB** (local or cloud instance - MongoDB Atlas recommended)
+- **npm** or **yarn** package manager
+- **Git** for version control
 
-### Environment Variables
+### Installation
 
-Create `.env` files in both root and backend directories:
+1. **Clone the repository**:
 
-**Frontend (.env)**
+   ```bash
+   git clone <repository-url>
+   cd task-board
+   ```
 
-```env
-VITE_API_URL=http://localhost:5000/api
-```
+2. **Install dependencies**:
 
-**Backend (.env)**
+   ```bash
+   # Install frontend dependencies
+   npm install
 
-```env
-PORT=5000
-MONGODB_URI=mongodb://localhost:27017/taskboard
-JWT_SECRET=your-super-secret-jwt-key
-NODE_ENV=development
-CORS_ORIGIN=http://localhost:5173
-FRONTEND_URL=http://localhost:5173
-```
+   # Install backend dependencies
+   cd backend
+   npm install
+   cd ..
+   ```
 
-### Installation Steps
+3. **Set up environment variables**:
 
-1. **Clone the repository**
+   **Backend** (create `backend/.env`):
 
-```bash
-git clone <repository-url>
-cd task-board
-```
+   ```bash
+   PORT=5000
+   MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/taskboard
+   JWT_SECRET=your-super-secret-jwt-key-here
+   CORS_ORIGIN=http://localhost:3000
+   ```
 
-2. **Install frontend dependencies**
+   **Frontend** (create `.env` in root):
 
-```bash
-npm install
-```
+   ```bash
+   VITE_API_URL=http://localhost:5000/api
+   ```
 
-3. **Install backend dependencies**
+4. **Start the development servers**:
 
-```bash
-cd backend
-npm install
-```
+   ```bash
+   # Terminal 1: Start backend
+   cd backend
+   npm run dev
 
-4. **Start MongoDB**
+   # Terminal 2: Start frontend
+   npm run dev
+   ```
 
-```bash
-# Make sure MongoDB is running on your system
-mongod
-```
+5. **Access the application**:
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:5000
+   - Health Check: http://localhost:5000/api/health
 
-5. **Start the backend server**
-
-```bash
-cd backend
-npm run dev
-```
-
-6. **Start the frontend development server**
-
-```bash
-# In a new terminal, from the root directory
-npm run dev
-```
-
-7. **Access the application**
-
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:5000
-
-## 🎯 Core Features Deep Dive
-
-### 1. Real-Time Collaboration
-
-**Socket.io Integration**
-
-- WebSocket connection for real-time updates
-- Room-based broadcasting for board-specific events
-- User presence tracking and activity indicators
-- Automatic reconnection handling
-
-**Real-Time Events**
-
-- Task creation, updates, deletion, and movement
-- Column creation, updates, deletion, and reordering
-- User join/leave notifications
-- Editing indicators for concurrent editing
-
-**Implementation Details**
-
-```typescript
-// Socket service for real-time communication
-class SocketService {
-  private socket: Socket | null = null;
-  private currentBoardId: string | null = null;
-
-  connect(token: string): Promise<void> {
-    // Establish WebSocket connection with JWT authentication
-  }
-
-  joinBoard(boardId: string): void {
-    // Join board-specific room for targeted updates
-  }
-
-  emitTaskUpdated(taskId: string, task: any): void {
-    // Emit task updates to all board members
-  }
-}
-```
-
-### 2. Board Sharing & Access Control
-
-**Role-Based Permissions**
-
-- **Owner**: Full access to everything (board creator)
-- **Admin**: Can edit, delete, and manage members
-- **Editor**: Can edit tasks and columns
-- **Viewer**: Can only view the board
-
-**Permission Matrix**
-
-```typescript
-const permissions = {
-  owner: {
-    canView: true,
-    canEdit: true,
-    canDelete: true,
-    canInvite: true,
-    canManageMembers: true,
-  },
-  admin: {
-    canView: true,
-    canEdit: true,
-    canDelete: true,
-    canInvite: true,
-    canManageMembers: true,
-  },
-  editor: {
-    canView: true,
-    canEdit: true,
-    canDelete: false,
-    canInvite: false,
-    canManageMembers: false,
-  },
-  viewer: {
-    canView: true,
-    canEdit: false,
-    canDelete: false,
-    canInvite: false,
-    canManageMembers: false,
-  },
-};
-```
-
-**Invite Link System**
-
-- JWT-based secure invite tokens
-- Role assignment during invite creation
-- Expiration dates and usage limits
-- Automatic board joining via invite URLs
-
-### 3. Drag & Drop Interface
-
-**@dnd-kit Implementation**
-
-- Smooth drag and drop for tasks and columns
-- Visual feedback during drag operations
-- Collision detection and drop zones
-- Accessibility support
-
-**Key Features**
-
-- Task reordering within columns
-- Task movement between columns
-- Column reordering
-- Drag overlay for visual feedback
-
-### 4. State Management
-
-**Zustand Stores**
-
-- **useAuthStore**: Authentication state and user management
-- **useBoardStore**: Board, column, and task state with real-time handlers
-- **useSharingStore**: Board sharing and member management
-- **useCollaborationStore**: Real-time collaboration state
-- **useSearchStore**: Global search functionality
-
-**State Persistence**
-
-- Local storage persistence for boards and user data
-- Automatic state restoration on app reload
-- Real-time state synchronization across users
-
-## 🔒 Security Features
+## 📖 Usage
 
 ### Authentication
 
-- JWT token-based authentication
-- Secure password hashing with bcrypt
-- Token expiration and refresh handling
-- Protected route middleware
+1. **Register a new account**:
 
-### Authorization
+   - Navigate to the signup page
+   - Enter your email, username, and password
+   - Verify your account and login
 
-- Role-based access control (RBAC)
-- Permission-based UI rendering
-- Server-side permission validation
-- Secure invite link generation
+2. **Login**:
+   - Use your credentials to login
+   - Access your dashboard with all your boards
 
-### Data Protection
+### Board Management
 
-- Input validation and sanitization
-- CORS configuration for cross-origin requests
-- MongoDB injection prevention
-- XSS protection through React's built-in escaping
+1. **Create a board**:
 
-## 🎨 UI/UX Design
+   - Click "Create Board" button
+   - Enter board name and description
+   - Start organizing tasks immediately
 
-### Design System
+2. **Add columns**:
 
-- **Color Palette**: Primary indigo, secondary zinc, accent emerald
-- **Typography**: Inter for body text, Sora for headings
-- **Spacing**: Consistent 4px grid system
-- **Components**: Reusable UI components with variants
+   - Use the "Add Column" button
+   - Create workflow columns (e.g., To Do, In Progress, Done)
+   - Reorder columns by dragging
 
-### Responsive Design
+3. **Create tasks**:
+   - Click "Add Task" in any column
+   - Fill in task details (title, description, priority, due date)
+   - Assign to team members
+   - Set priority levels (Low, Medium, High)
 
-- Mobile-first approach
-- Breakpoint-based responsive layouts
-- Touch-friendly drag and drop
-- Adaptive navigation and menus
+### Collaboration & Permissions
 
-### Dark Mode
+1. **Share boards**:
 
-- System preference detection
-- Manual theme toggle
-- Consistent color scheme across themes
-- Smooth theme transitions
+   - Click the "Share" button on any board
+   - Add team members by email
+   - Set appropriate roles:
+     - **Owner**: Full control, can manage members and delete board
+     - **Editor**: Can edit tasks, columns, and board settings
+     - **Viewer**: Read-only access to view tasks and board
 
-### Animations
+2. **Real-time updates**:
+   - Changes appear instantly for all users
+   - See who's currently viewing the board
+   - Monitor connection status
+   - Real-time notifications for all actions
 
-- Framer Motion for smooth transitions
-- Loading states and feedback
-- Hover effects and micro-interactions
-- Drag and drop visual feedback
+### Task Management
 
-## 📊 Performance Optimizations
+1. **Drag & Drop**:
 
-### Frontend
+   - Move tasks between columns
+   - Reorder tasks within columns
+   - Real-time synchronization across all users
 
-- **Code Splitting**: Route-based code splitting
-- **Lazy Loading**: Component lazy loading
-- **Memoization**: React.memo for expensive components
-- **Virtual Scrolling**: For large task lists
-- **Debounced Search**: Optimized search performance
+2. **Task Details**:
 
-### Backend
+   - Click on tasks to edit
+   - Set priorities and due dates
+   - Assign to team members
+   - Add descriptions and notes
 
-- **Database Indexing**: Optimized MongoDB queries
-- **Caching**: Redis for session and data caching
-- **Connection Pooling**: MongoDB connection management
-- **Rate Limiting**: API rate limiting protection
+3. **Search & Filter**:
+   - Use the search bar to find tasks
+   - Filter by priority, assignee, or due date
+   - Sort tasks by various criteria
 
-### Real-Time
+## 🔌 API Endpoints
 
-- **Event Batching**: Batch multiple updates
-- **Room-based Broadcasting**: Targeted event emission
-- **Connection Management**: Efficient WebSocket handling
-- **Heartbeat System**: Connection health monitoring
+### Authentication
+
+- `POST /api/auth/register` - User registration
+- `POST /api/auth/login` - User login
+- `GET /api/auth/profile` - Get user profile
+- `PUT /api/auth/profile` - Update user profile
+
+### Boards
+
+- `GET /api/boards` - Get user's boards
+- `POST /api/boards` - Create new board
+- `GET /api/boards/:id` - Get board details
+- `PUT /api/boards/:id` - Update board
+- `DELETE /api/boards/:id` - Delete board
+
+### Tasks
+
+- `POST /api/boards/:boardId/tasks` - Create task
+- `PUT /api/boards/:boardId/tasks/:taskId` - Update task
+- `DELETE /api/boards/:boardId/tasks/:taskId` - Delete task
+- `POST /api/boards/:boardId/tasks/:taskId/move` - Move task between columns
+
+### Columns
+
+- `POST /api/boards/:boardId/columns` - Create column
+- `PUT /api/boards/:boardId/columns/:columnId` - Update column
+- `DELETE /api/boards/:boardId/columns/:columnId` - Delete column
+- `POST /api/boards/:boardId/columns/:columnId/tasks/reorder` - Reorder tasks in column
+
+### Sharing
+
+- `GET /api/sharing/boards/:boardId/members` - Get board members
+- `POST /api/sharing/boards/:boardId/members` - Add member
+- `DELETE /api/sharing/boards/:boardId/members/:userId` - Remove member
+- `PUT /api/sharing/boards/:boardId/members/:userId/role` - Update member role
+
+### Health Check
+
+- `GET /api/health` - Server health status
+
+## 🗄️ Database Schema
+
+### User Model
+
+```typescript
+{
+  _id: ObjectId,
+  name: String (required),
+  email: String (required, unique),
+  password: String (hashed, required),
+  avatar: String (optional),
+  createdAt: String,
+  updatedAt: String
+}
+```
+
+### Board Model
+
+```typescript
+{
+  _id: ObjectId,
+  id: String (unique),
+  name: String (required),
+  description: String (optional),
+  createdBy: ObjectId (ref: User),
+  isPublic: Boolean (default: false),
+  columns: [{
+    id: String,
+    name: String,
+    taskIds: [String],
+    createdAt: String,
+    updatedAt: String
+  }],
+  tasks: Map<String, {
+    id: String,
+    title: String,
+    description: String,
+    createdBy: ObjectId,
+    assignedTo: ObjectId (optional),
+    priority: "low" | "medium" | "high",
+    dueDate: String,
+    createdAt: String,
+    updatedAt: String
+  }>,
+  members: [{
+    userId: ObjectId (ref: User),
+    role: "owner" | "editor" | "viewer",
+    invitedBy: ObjectId (ref: User),
+    invitedAt: String,
+    joinedAt: String (optional),
+    permissions: {
+      canView: Boolean,
+      canEdit: Boolean,
+      canDelete: Boolean,
+      canInvite: Boolean,
+      canManageMembers: Boolean
+    }
+  }],
+  settings: {
+    allowGuestAccess: Boolean,
+    requireApproval: Boolean,
+    defaultRole: "editor" | "viewer"
+  },
+  createdAt: String,
+  updatedAt: String
+}
+```
+
+## 🔄 Real-time Collaboration
+
+### Socket.IO Events
+
+#### Client to Server
+
+- `join-board` - Join a board room
+- `leave-board` - Leave a board room
+- `task-added` - Create a new task
+- `task-updated` - Update an existing task
+- `task-deleted` - Delete a task
+- `task-moved` - Move task between columns
+- `column-added` - Create a new column
+- `column-updated` - Update column details
+- `column-deleted` - Delete a column
+- `user-editing` - User is editing a task
+- `activity` - User activity heartbeat
+
+#### Server to Client
+
+- `user-joined` - New user joined the board
+- `user-left` - User left the board
+- `active-users` - List of active users
+- `task-created` - New task created
+- `task-updated` - Task updated
+- `task-deleted` - Task deleted
+- `task-moved` - Task moved
+- `column-created` - New column created
+- `column-updated` - Column updated
+- `column-deleted` - Column deleted
+- `board-updated` - Board details updated
+- `board-deleted` - Board deleted
+
+## 🔒 Security Features
+
+- **JWT Authentication**: Secure token-based authentication with expiration
+- **Password Hashing**: Bcrypt password encryption with salt rounds
+- **CORS Protection**: Cross-origin request protection with configurable origins
+- **Input Validation**: Server-side data validation and sanitization
+- **Role-based Access Control**: Permission-based feature access
+- **MongoDB Injection Protection**: Mongoose query sanitization
+- **XSS Protection**: Input sanitization and output encoding
+- **Environment Variable Security**: Sensitive data stored in environment variables
+- **Error Handling**: Comprehensive error handling without exposing sensitive information
 
 ## 🚀 Deployment
 
-### Frontend Deployment (Vercel)
-
-```bash
-# Build the application
-npm run build
-
-# Deploy to Vercel
-vercel --prod
-```
-
 ### Backend Deployment (Render)
 
+1. **Create a Render account** and connect your GitHub repository
+
+2. **Create a new Web Service**:
+
+   - **Name**: `taskboard-backend`
+   - **Environment**: `Node`
+   - **Build Command**: `npm install && npm run build`
+   - **Start Command**: `npm start`
+
+3. **Configure environment variables** in Render dashboard:
+
+   ```
+   MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/taskboard
+   JWT_SECRET=your-super-secret-jwt-key-here
+   CORS_ORIGIN=https://your-frontend-domain.vercel.app
+   NODE_ENV=production
+   ```
+
+4. **Deploy** and note the backend URL (e.g., `https://taskboard-backend.onrender.com`)
+
+### Frontend Deployment (Vercel)
+
+1. **Create a Vercel account** and import your GitHub repository
+
+2. **Configure environment variables** in Vercel dashboard:
+
+   ```
+   VITE_API_URL=https://your-backend-url.onrender.com/api
+   ```
+
+3. **Deploy** and get your frontend URL (e.g., `https://taskboard-frontend.vercel.app`)
+
+4. **Update CORS** in your backend environment variables with your Vercel frontend URL
+
+### Environment Variables
+
+#### Backend (.env)
+
 ```bash
-# Set environment variables in Render dashboard
-# Deploy from GitHub repository
-```
+# Database
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/taskboard
 
-### Environment Configuration
+# Authentication
+JWT_SECRET=your-super-secret-jwt-key-here
 
-```env
-# Production Environment Variables
+# Server
+PORT=5000
 NODE_ENV=production
-MONGODB_URI=mongodb+srv://...
-JWT_SECRET=production-secret-key
-CORS_ORIGIN=https://your-frontend-domain.com
-FRONTEND_URL=https://your-frontend-domain.com
+
+# CORS (comma-separated for multiple origins)
+CORS_ORIGIN=https://your-frontend-domain.vercel.app
 ```
+
+#### Frontend (.env)
+
+```bash
+# API Configuration
+VITE_API_URL=https://your-backend-url.onrender.com/api
+```
+
+### Troubleshooting Deployment
+
+#### Common Issues:
+
+1. **CORS Errors**: Ensure `CORS_ORIGIN` is set correctly in backend
+2. **Build Failures**: Check Node.js version compatibility (v18+)
+3. **Database Connection**: Verify MongoDB URI and network access
+4. **Environment Variables**: Ensure all required variables are set in deployment platform
+5. **Port Issues**: Render automatically sets PORT, don't override
+
+## 💻 Development
+
+### Available Scripts
+
+#### Frontend
+
+```bash
+npm run dev          # Start development server
+npm run build        # Build for production
+npm run preview      # Preview production build
+npm run lint         # Run ESLint
+```
+
+#### Backend
+
+```bash
+npm run dev          # Start development server with nodemon
+npm run build        # Build TypeScript
+npm start            # Start production server
+npm run lint         # Run ESLint
+```
+
+### Code Style
+
+- **TypeScript**: Strict type checking enabled
+- **ESLint**: Code linting and formatting
+- **Prettier**: Code formatting (recommended)
+- **Conventional Commits**: Git commit message format
+
+### Development Workflow
+
+1. **Fork the repository**
+2. **Create a feature branch**: `git checkout -b feature-name`
+3. **Make your changes** and test thoroughly
+4. **Commit your changes**: `git commit -m 'feat: add new feature'`
+5. **Push to the branch**: `git push origin feature-name`
+6. **Create a Pull Request**
 
 ## 🧪 Testing
 
-### Frontend Testing
+See [QUICK_START_TESTING.md](./QUICK_START_TESTING.md) for comprehensive testing guidelines including:
 
-```bash
-# Run unit tests
-npm test
-
-# Run integration tests
-npm run test:integration
-
-# Run E2E tests
-npm run test:e2e
-```
-
-### Backend Testing
-
-```bash
-# Run API tests
-npm test
-
-# Run database tests
-npm run test:db
-```
-
-## 📈 Monitoring & Analytics
-
-### Error Tracking
-
-- Sentry integration for error monitoring
-- Performance monitoring
-- User session tracking
-
-### Analytics
-
-- User engagement metrics
-- Board usage statistics
-- Real-time collaboration metrics
-
-## 🔧 Development Workflow
-
-### Code Quality
-
-- ESLint for code linting
-- Prettier for code formatting
-- TypeScript strict mode
-- Pre-commit hooks
-
-### Git Workflow
-
-```bash
-# Feature development
-git checkout -b feature/new-feature
-git add .
-git commit -m "feat: add new feature"
-git push origin feature/new-feature
-
-# Create pull request
-# Code review and merge
-```
-
-### Database Migrations
-
-```javascript
-// MongoDB migration script
-db.boards.updateMany(
-  {},
-  {
-    $set: {
-      isPublic: false,
-      members: [],
-      inviteLinks: [],
-      settings: {
-        allowGuestAccess: false,
-        requireApproval: false,
-        defaultRole: "viewer",
-      },
-    },
-  }
-);
-```
+- Manual testing procedures
+- Feature testing checklist
+- Common issues and solutions
+- Performance testing
+- Security testing
 
 ## 🤝 Contributing
 
-### Development Setup
+We welcome contributions! Please follow these steps:
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Submit a pull request
+1. **Fork the repository**
+2. **Create a feature branch**: `git checkout -b feature-name`
+3. **Make your changes** and test thoroughly
+4. **Follow the code style** guidelines
+5. **Commit your changes**: `git commit -m 'feat: add new feature'`
+6. **Push to the branch**: `git push origin feature-name`
+7. **Create a Pull Request** with detailed description
 
-### Code Standards
+### Code Style Guidelines
 
-- Follow TypeScript best practices
-- Use meaningful commit messages
-- Write comprehensive documentation
-- Include unit tests for new features
+- Use TypeScript for all new code
+- Follow ESLint rules
+- Write meaningful commit messages
+- Add tests for new features
+- Update documentation as needed
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
-
-- [React](https://reactjs.org/) - Frontend framework
-- [Node.js](https://nodejs.org/) - Backend runtime
-- [MongoDB](https://www.mongodb.com/) - Database
-- [Socket.io](https://socket.io/) - Real-time communication
-- [Tailwind CSS](https://tailwindcss.com/) - CSS framework
-- [Framer Motion](https://www.framer.com/motion/) - Animation library
-- [Zustand](https://github.com/pmndrs/zustand) - State management
-- [@dnd-kit](https://dndkit.com/) - Drag and drop library
-
-## 📞 Support
+## 🆘 Support
 
 For support and questions:
 
-- Create an issue on GitHub
-- Check the documentation
-- Review the troubleshooting guide
+- **Create an issue** in the repository
+- **Check the documentation** for common solutions
+- **Review the testing guide** for troubleshooting
+- **Check deployment logs** for deployment issues
+
+### Common Support Topics
+
+- **Authentication Issues**: Check JWT_SECRET and token expiration
+- **Real-time Issues**: Verify Socket.IO connection and CORS settings
+- **Permission Issues**: Check user roles and board access
+- **Deployment Issues**: Verify environment variables and build commands
 
 ---
 
-**TaskBoard** - Empowering teams with real-time collaboration and intuitive task management.
+**Built with ❤️ using React, Node.js, and Socket.IO**
+
+_Last updated: December 2024_

@@ -4,8 +4,8 @@ export type Task = {
   id: string;
   title: string;
   description: string;
-  createdBy: string;
-  assignedTo: string;
+  createdBy: string | null;
+  assignedTo: string | null;
   priority: Priority;
   dueDate: string;
   createdAt: string;

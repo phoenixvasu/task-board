@@ -3,30 +3,16 @@ import { api } from '../api';
 
 export interface BoardMember {
   userId: string;
-  role: 'owner' | 'admin' | 'editor' | 'viewer';
+  username: string;
+  email: string;
+  role: 'owner' | 'editor' | 'viewer';
   invitedAt: string;
   joinedAt?: string;
-  user: {
-    id: string;
-    name: string;
-    email: string;
-    avatar?: string;
-  };
-}
-
-export interface InviteLink {
-  id: string;
-  role: 'admin' | 'editor' | 'viewer';
-  createdAt: string;
-  expiresAt?: string;
-  maxUses?: number;
-  usedCount: number;
-  inviteUrl: string;
 }
 
 export interface BoardAccess {
   hasAccess: boolean;
-  role?: 'owner' | 'admin' | 'editor' | 'viewer';
+  role: 'owner' | 'editor' | 'viewer';
   permissions: {
     canView: boolean;
     canEdit: boolean;
@@ -36,66 +22,40 @@ export interface BoardAccess {
   };
 }
 
-export interface SharingSettings {
-  isPublic: boolean;
-  settings: {
-    allowGuestAccess: boolean;
-    requireApproval: boolean;
-    defaultRole: 'admin' | 'editor' | 'viewer';
-  };
-  memberCount: number;
-  inviteLinkCount: number;
-}
-
 interface SharingState {
   // Board members
   members: BoardMember[];
   isLoadingMembers: boolean;
   
-  // Invite links
-  inviteLinks: InviteLink[];
-  isLoadingInviteLinks: boolean;
-  
   // Board access
   boardAccess: BoardAccess | null;
   
-  // Sharing settings
-  sharingSettings: SharingSettings | null;
-  
   // Actions
   fetchMembers: (boardId: string) => Promise<void>;
-  addMember: (boardId: string, userId: string, role: 'admin' | 'editor' | 'viewer') => Promise<boolean>;
+  addMember: (boardId: string, userId: string, role: 'editor' | 'viewer') => Promise<boolean>;
   removeMember: (boardId: string, userId: string) => Promise<boolean>;
-  updateMemberRole: (boardId: string, userId: string, role: 'admin' | 'editor' | 'viewer') => Promise<boolean>;
-  
-  fetchInviteLinks: (boardId: string) => Promise<void>;
-  createInviteLink: (boardId: string, role: 'admin' | 'editor' | 'viewer', options?: {
-    expiresAt?: string;
-    maxUses?: number;
-  }) => Promise<InviteLink | null>;
-  revokeInviteLink: (boardId: string, linkId: string) => Promise<boolean>;
+  updateMemberRole: (boardId: string, userId: string, role: 'editor' | 'viewer') => Promise<boolean>;
   
   checkBoardAccess: (boardId: string) => Promise<BoardAccess>;
-  fetchSharingSettings: (boardId: string) => Promise<void>;
-  updateSharingSettings: (boardId: string, settings: Partial<SharingSettings>) => Promise<boolean>;
   
   // Utility
   clearSharingData: () => void;
+
+  // New field
+  getSharedBoards: () => Promise<any[]>;
 }
 
 export const useSharingStore = create<SharingState>((set, get) => ({
+  // Initial state
   members: [],
   isLoadingMembers: false,
-  inviteLinks: [],
-  isLoadingInviteLinks: false,
   boardAccess: null,
-  sharingSettings: null,
 
   fetchMembers: async (boardId: string) => {
     set({ isLoadingMembers: true });
     try {
-      const token = localStorage.getItem('token');
-      const members = await api.get(`/sharing/boards/${boardId}/members`, token);
+      const token = localStorage.getItem('jwt');
+      const members = await api.get(`/sharing/boards/${boardId}/members`, token || undefined);
       set({ members, isLoadingMembers: false });
     } catch (error) {
       console.error('Failed to fetch members:', error);
@@ -103,10 +63,10 @@ export const useSharingStore = create<SharingState>((set, get) => ({
     }
   },
 
-  addMember: async (boardId: string, userId: string, role: 'admin' | 'editor' | 'viewer') => {
+  addMember: async (boardId: string, userId: string, role: 'editor' | 'viewer') => {
     try {
-      const token = localStorage.getItem('token');
-      await api.post(`/sharing/boards/${boardId}/members`, { userId, role }, token);
+      const token = localStorage.getItem('jwt');
+      await api.post(`/sharing/boards/${boardId}/members`, { userId, role }, token || undefined);
       
       // Refresh members list
       await get().fetchMembers(boardId);
@@ -119,8 +79,8 @@ export const useSharingStore = create<SharingState>((set, get) => ({
 
   removeMember: async (boardId: string, userId: string) => {
     try {
-      const token = localStorage.getItem('token');
-      await api.delete(`/sharing/boards/${boardId}/members/${userId}`, token);
+      const token = localStorage.getItem('jwt');
+      await api.delete(`/sharing/boards/${boardId}/members/${userId}`, token || undefined);
       
       // Refresh members list
       await get().fetchMembers(boardId);
@@ -131,76 +91,37 @@ export const useSharingStore = create<SharingState>((set, get) => ({
     }
   },
 
-  updateMemberRole: async (boardId: string, userId: string, role: 'admin' | 'editor' | 'viewer') => {
+  updateMemberRole: async (boardId: string, userId: string, role: 'editor' | 'viewer') => {
     try {
-      const token = localStorage.getItem('token');
-      await api.put(`/sharing/boards/${boardId}/members/${userId}/role`, { role }, token);
+      const token = localStorage.getItem('jwt');
+      console.log('Sending role update request:', { boardId, userId, role });
+      const response = await api.put(`/sharing/boards/${boardId}/members/${userId}/role`, { role }, token || undefined);
+      console.log('Role update response:', response);
       
       // Refresh members list
       await get().fetchMembers(boardId);
       return true;
     } catch (error) {
       console.error('Failed to update member role:', error);
-      return false;
-    }
-  },
-
-  fetchInviteLinks: async (boardId: string) => {
-    set({ isLoadingInviteLinks: true });
-    try {
-      const token = localStorage.getItem('token');
-      const inviteLinks = await api.get(`/sharing/boards/${boardId}/invite-links`, token);
-      set({ inviteLinks, isLoadingInviteLinks: false });
-    } catch (error) {
-      console.error('Failed to fetch invite links:', error);
-      set({ isLoadingInviteLinks: false });
-    }
-  },
-
-  createInviteLink: async (boardId: string, role: 'admin' | 'editor' | 'viewer', options?: {
-    expiresAt?: string;
-    maxUses?: number;
-  }) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await api.post(`/sharing/boards/${boardId}/invite-links`, {
-        role,
-        ...options
-      }, token);
-      
-      // Refresh invite links list
-      await get().fetchInviteLinks(boardId);
-      return response.inviteLink;
-    } catch (error) {
-      console.error('Failed to create invite link:', error);
-      return null;
-    }
-  },
-
-  revokeInviteLink: async (boardId: string, linkId: string) => {
-    try {
-      const token = localStorage.getItem('token');
-      await api.delete(`/sharing/boards/${boardId}/invite-links/${linkId}`, token);
-      
-      // Refresh invite links list
-      await get().fetchInviteLinks(boardId);
-      return true;
-    } catch (error) {
-      console.error('Failed to revoke invite link:', error);
+      // Log more details about the error
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+      }
       return false;
     }
   },
 
   checkBoardAccess: async (boardId: string) => {
     try {
-      const token = localStorage.getItem('token');
-      const access = await api.get(`/sharing/boards/${boardId}/access`, token);
+      const token = localStorage.getItem('jwt');
+      const access = await api.get(`/sharing/boards/${boardId}/access`, token || undefined);
       set({ boardAccess: access });
       return access;
     } catch (error) {
       console.error('Failed to check board access:', error);
       const defaultAccess: BoardAccess = {
         hasAccess: false,
+        role: 'viewer',
         permissions: {
           canView: false,
           canEdit: false,
@@ -214,36 +135,21 @@ export const useSharingStore = create<SharingState>((set, get) => ({
     }
   },
 
-  fetchSharingSettings: async (boardId: string) => {
-    try {
-      const token = localStorage.getItem('token');
-      const settings = await api.get(`/sharing/boards/${boardId}/sharing-settings`, token);
-      set({ sharingSettings: settings });
-    } catch (error) {
-      console.error('Failed to fetch sharing settings:', error);
-    }
-  },
-
-  updateSharingSettings: async (boardId: string, settings: Partial<SharingSettings>) => {
-    try {
-      const token = localStorage.getItem('token');
-      await api.put(`/sharing/boards/${boardId}/sharing-settings`, settings, token);
-      
-      // Refresh sharing settings
-      await get().fetchSharingSettings(boardId);
-      return true;
-    } catch (error) {
-      console.error('Failed to update sharing settings:', error);
-      return false;
-    }
-  },
-
   clearSharingData: () => {
     set({
       members: [],
-      inviteLinks: [],
-      boardAccess: null,
-      sharingSettings: null
+      boardAccess: null
     });
+  },
+
+  getSharedBoards: async () => {
+    try {
+      const token = localStorage.getItem('jwt');
+      const sharedBoards = await api.get('/sharing/shared-boards', token || undefined);
+      return Array.isArray(sharedBoards) ? sharedBoards : [];
+    } catch (error) {
+      console.error('Failed to fetch shared boards:', error);
+      return [];
+    }
   }
 })); 

@@ -9,7 +9,6 @@ import {
   Edit,
   Trash2,
   Share2,
-  Lock
 } from 'lucide-react';
 import { useBoardStore } from '../store/useBoardStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -43,6 +42,14 @@ const BoardList: React.FC = () => {
     // eslint-disable-next-line
   }, [fetchBoards, setPage]);
 
+  // Fetch shared boards when switching to shared tab
+  useEffect(() => {
+    if (activeTab === 'shared') {
+      fetchSharedBoards();
+    }
+    // eslint-disable-next-line
+  }, [activeTab]);
+
   const fetchSharedBoards = async () => {
     try {
       const shared = await getSharedBoards();
@@ -55,18 +62,17 @@ const BoardList: React.FC = () => {
   // Filter boards based on search term and active tab
   const filteredBoards = useMemo(() => {
     if (activeTab === 'owned') {
-      const boardsArray = Object.values(boards);
+      const boardsArray = Object.values(boards || {});
       if (!searchTerm) return boardsArray;
-      
-      return boardsArray.filter(board => 
-        board.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      return boardsArray.filter(board =>
+        board.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (board.description && board.description.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     } else {
+      if (!Array.isArray(sharedBoards)) return [];
       if (!searchTerm) return sharedBoards;
-      
-      return sharedBoards.filter(board => 
-        board.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      return sharedBoards.filter(board =>
+        board.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (board.description && board.description.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
@@ -77,13 +83,24 @@ const BoardList: React.FC = () => {
       toast.error('Please enter a board name');
       return;
     }
+    
     setIsLoading(true);
-    await createBoard(newBoardName.trim(), newBoardDescription.trim());
-    setNewBoardName('');
-    setNewBoardDescription('');
-    setShowCreateModal(false);
-    setIsLoading(false);
-    toast.success('Board created successfully!');
+    try {
+      const boardId = await createBoard(newBoardName.trim(), newBoardDescription.trim());
+      if (boardId) {
+        setNewBoardName('');
+        setNewBoardDescription('');
+        setShowCreateModal(false);
+        toast.success('Board created successfully!');
+      } else {
+        toast.error('Failed to create board. Please try again.');
+      }
+    } catch (error) {
+      console.error('Board creation error:', error);
+      toast.error('Failed to create board. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleEditBoard = (board: any) => {
@@ -112,11 +129,22 @@ const BoardList: React.FC = () => {
   };
 
   const handleDeleteBoard = async (boardId: string, boardName: string) => {
+    if (!boardId || !boardId.trim()) {
+      toast.error('Invalid board ID');
+      return;
+    }
+    
     if (window.confirm(`Are you sure you want to delete "${boardName}"?`)) {
       setIsLoading(true);
-      await deleteBoard(boardId);
-      setIsLoading(false);
-      toast.success('Board deleted successfully!');
+      try {
+        await deleteBoard(boardId);
+        toast.success('Board deleted successfully!');
+      } catch (error) {
+        console.error('Board deletion error:', error);
+        toast.error('Failed to delete board. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -186,7 +214,7 @@ const BoardList: React.FC = () => {
 
         {/* Boards Table */}
         <div className="bg-white dark:bg-secondary rounded-lg shadow overflow-hidden">
-          {filteredBoards.length === 0 ? (
+          {Array.isArray(filteredBoards) && filteredBoards.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-gray-400 mb-4">
                 <Calendar size={48} className="mx-auto" />
@@ -242,83 +270,88 @@ const BoardList: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-secondary divide-y divide-gray-200 dark:divide-gray-700">
-                  {filteredBoards.map((board) => (
-                    <motion.tr
-                      key={board.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      whileHover={{ backgroundColor: '#f9fafb' }}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <Link
-                            to={`/board/${board.id}`}
-                            className="text-sm font-medium text-primary hover:text-primary-dark transition-colors"
-                          >
-                            {board.name}
-                          </Link>
-                          {activeTab === 'shared' && (
-                            <Share2 size={14} className="ml-2 text-gray-400" />
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm text-gray-600 dark:text-gray-400 truncate max-w-xs">
-                          {board.description || 'No description'}
-                        </p>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-medium rounded ${getRoleColor(board.role || 'owner')}`}>
-                          {board.role || 'owner'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                        <div className="flex items-center">
-                          <Users size={14} className="mr-1" />
-                          {getTotalColumns(board)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                        <div className="flex items-center">
-                          <Calendar size={14} className="mr-1" />
-                          {getTotalTasks(board)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                        <div className="flex items-center">
-                          <Clock size={14} className="mr-1" />
-                          {formatDate(board.createdAt)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex items-center space-x-2">
-                          <Link
-                            to={`/board/${board.id}`}
-                            className="text-primary hover:text-primary-dark transition-colors"
-                          >
-                            Open
-                          </Link>
-                          {activeTab === 'owned' && (
-                            <>
-                              <button
-                                onClick={() => handleEditBoard(board)}
-                                className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
-                              >
-                                <Edit size={14} />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteBoard(board.id, board.name)}
-                                className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </motion.tr>
-                  ))}
+                  {Array.isArray(filteredBoards) && filteredBoards.map((board, idx) => {
+                    const boardId = board.id || board.boardId || `board-${idx}`;
+                    const uniqueKey = `${boardId}-${activeTab}-${idx}`;
+                    
+                    return (
+                      <motion.tr
+                        key={uniqueKey}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        whileHover={{ backgroundColor: '#f9fafb' }}
+                        className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <Link
+                              to={`/board/${boardId}`}
+                              className="text-sm font-medium text-primary hover:text-primary-dark transition-colors"
+                            >
+                              {board.name}
+                            </Link>
+                            {activeTab === 'shared' && (
+                              <Share2 size={14} className="ml-2 text-gray-400" />
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="text-sm text-gray-600 dark:text-gray-400 truncate max-w-xs">
+                            {board.description || 'No description'}
+                          </p>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 text-xs font-medium rounded ${getRoleColor(board.role || 'owner')}`}>
+                            {board.role || 'owner'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                          <div className="flex items-center">
+                            <Users size={14} className="mr-1" />
+                            {getTotalColumns(board)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                          <div className="flex items-center">
+                            <Calendar size={14} className="mr-1" />
+                            {getTotalTasks(board)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                          <div className="flex items-center">
+                            <Clock size={14} className="mr-1" />
+                            {formatDate(board.createdAt)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex items-center space-x-2">
+                            <Link
+                              to={`/board/${boardId}`}
+                              className="text-primary hover:text-primary-dark transition-colors"
+                            >
+                              Open
+                            </Link>
+                            {activeTab === 'owned' && (
+                              <>
+                                <button
+                                  onClick={() => handleEditBoard(board)}
+                                  className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                                >
+                                  <Edit size={14} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteBoard(boardId, board.name)}
+                                  className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </motion.tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

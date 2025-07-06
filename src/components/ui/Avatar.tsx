@@ -2,8 +2,8 @@ import React from 'react';
 import { getInitials, getRandomColor } from '../../utils';
 
 interface AvatarProps {
-  user: {
-    name: string;
+  user?: {
+    name?: string;
     avatar?: string;
   };
   size?: 'sm' | 'md' | 'lg';
@@ -20,19 +20,40 @@ const Avatar: React.FC<AvatarProps> = ({ user, size = 'md', className = '' }) =>
   const baseClasses = 'rounded-full flex items-center justify-center font-medium text-white';
   const classes = `${baseClasses} ${sizeClasses[size]} ${className}`;
 
+  // Handle undefined or incomplete user object
+  if (!user || !user.name) {
+    return (
+      <div className={`${classes} ${getRandomColor()} bg-gray-400`}>
+        ?
+      </div>
+    );
+  }
+
   if (user.avatar) {
     return (
       <img
         src={user.avatar}
         alt={user.name}
         className={`${classes} object-cover`}
+        onError={(e) => {
+          // Fallback to initials if image fails to load
+          const target = e.target as HTMLImageElement;
+          target.style.display = 'none';
+          const parent = target.parentElement;
+          if (parent) {
+            const fallback = document.createElement('div');
+            fallback.className = `${classes} ${getRandomColor()}`;
+            fallback.textContent = getInitials(user.name || '');
+            parent.appendChild(fallback);
+          }
+        }}
       />
     );
   }
 
   return (
     <div className={`${classes} ${getRandomColor()}`}>
-      {getInitials(user.name)}
+      {getInitials(user.name || '')}
     </div>
   );
 };

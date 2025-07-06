@@ -3,21 +3,28 @@ import { useSocket } from '../../api/socket';
 import { useCollaborationStore } from '../../store/useCollaborationStore';
 import { Wifi, WifiOff, Users, Clock } from 'lucide-react';
 
-const ConnectionStatus: React.FC = () => {
-  const { isConnected } = useSocket();
+interface ConnectionStatusProps {
+  isConnected?: boolean;
+}
+
+const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ isConnected: propIsConnected }) => {
+  const { isConnected: socketIsConnected } = useSocket();
   const { activeUsers, isReceivingUpdates } = useCollaborationStore();
+  
+  // Use prop if provided, otherwise use socket status
+  const connectionStatus = propIsConnected !== undefined ? propIsConnected : socketIsConnected();
 
   return (
     <div className="flex items-center gap-4 text-sm">
       {/* Connection Status */}
       <div className="flex items-center gap-1">
-        {isConnected() ? (
+        {connectionStatus ? (
           <Wifi size={14} className="text-green-500" />
         ) : (
           <WifiOff size={14} className="text-red-500" />
         )}
-        <span className={isConnected() ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
-          {isConnected() ? 'Connected' : 'Disconnected'}
+        <span className={connectionStatus ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+          {connectionStatus ? 'Connected' : 'Disconnected'}
         </span>
       </div>
 

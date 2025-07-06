@@ -2,22 +2,25 @@ import React, { useState } from 'react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent, DragOverlay, useDroppable, useDraggable } from '@dnd-kit/core';
 import { arrayMove, SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { useBoardStore } from '../../store/useBoardStore';
-import { socketService } from '../../api/socket';
+import { useSharingStore } from '../../store/useSharingStore';
 import Column from '../column/Column';
 import TaskCard from '../task/TaskCard';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
 import { Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { Column as ColumnType } from '../../types';
+import { Column as ColumnType, FilterOptions, SortOptions } from '../../types';
+import { filterTasks, sortTasks } from '../../utils';
 
 interface BoardColumnsProps {
   boardId: string;
-  search?: string;
+  filters?: FilterOptions;
+  sortOptions?: SortOptions;
 }
 
-const BoardColumns: React.FC<BoardColumnsProps> = ({ boardId, search = '' }) => {
-  const { getBoard, reorderColumns, createColumn, reorderTasks } = useBoardStore();
+const BoardColumns: React.FC<BoardColumnsProps> = ({ boardId, filters, sortOptions }) => {
+  const { getBoard, reorderColumns, createColumn, moveTask } = useBoardStore();
+  const { boardAccess } = useSharingStore();
   const board = getBoard(boardId);
   const [showAddColumn, setShowAddColumn] = useState(false);
   const [newColumnName, setNewColumnName] = useState('');
@@ -43,7 +46,16 @@ const BoardColumns: React.FC<BoardColumnsProps> = ({ boardId, search = '' }) => 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveTask(null);
-    if (!over || active.id === over.id || !board) return;
+    
+    if (!over || active.id === over.id || !board) {
+      return;
+    }
+
+    // Check permissions before allowing drag operations
+    if (!boardAccess?.permissions.canEdit) {
+      toast.error('You do not have permission to modify this board');
+      return;
+    }
 
     // Column drag
     const isColumnDrag = board.columns.some(col => col.id === active.id);
@@ -55,9 +67,7 @@ const BoardColumns: React.FC<BoardColumnsProps> = ({ boardId, search = '' }) => 
         setIsLoading(true);
         await reorderColumns(boardId, newOrder);
         
-        // Emit socket event for real-time updates
-        socketService.emitColumnsReordered(newOrder);
-        
+        // Backend will emit socket event automatically
         setIsLoading(false);
         toast.success('Columns reordered');
       }
@@ -68,34 +78,31 @@ const BoardColumns: React.FC<BoardColumnsProps> = ({ boardId, search = '' }) => 
     const fromColumnId = findColumnIdByTaskId(active.id as string);
     let toColumnId: string | null = null;
     let newIndex = 0;
+    
+    // Check if dropping on a column
     if (board.columns.some(col => col.id === over.id)) {
       toColumnId = over.id as string;
-      newIndex = board.columns.find(col => col.id === toColumnId)?.taskIds.length || 0;
+      newIndex = 0; // Add to the beginning of the column
     } else {
-      toColumnId = findColumnIdByTaskId(over.id as string);
-      const toCol = board.columns.find(col => col.id === toColumnId);
-      newIndex = toCol ? toCol.taskIds.indexOf(over.id as string) : 0;
-    }
-    if (!fromColumnId || !toColumnId) return;
-
-    setIsLoading(true);
-    if (fromColumnId === toColumnId) {
-      // Reorder within the same column
-      const col = board.columns.find(c => c.id === fromColumnId);
-      if (!col) return;
-      const oldIndex = col.taskIds.indexOf(active.id as string);
-      if (oldIndex !== -1 && newIndex !== -1) {
-        const newOrder = arrayMove(col.taskIds, oldIndex, newIndex);
-        await reorderTasks(boardId, fromColumnId, newOrder);
-        toast.success('Tasks reordered');
+      // Dropping on a task - find the column and position
+      const targetColumn = board.columns.find(col => 
+        col.taskIds.includes(over.id as string)
+      );
+      if (targetColumn) {
+        toColumnId = targetColumn.id;
+        const targetIndex = targetColumn.taskIds.indexOf(over.id as string);
+        newIndex = targetIndex;
       }
-    } else {
-      // Move to another column
-      // Emit socket event for real-time updates
-      socketService.emitTaskMoved(active.id as string, fromColumnId, toColumnId, newIndex);
+    }
+
+    if (fromColumnId && toColumnId && fromColumnId !== toColumnId) {
+      setIsLoading(true);
+      await moveTask(boardId, active.id as string, fromColumnId, toColumnId, newIndex);
+      
+      // Backend will emit socket event automatically
+      setIsLoading(false);
       toast.success('Task moved');
     }
-    setIsLoading(false);
   };
 
   const handleAddColumn = async () => {
@@ -111,20 +118,26 @@ const BoardColumns: React.FC<BoardColumnsProps> = ({ boardId, search = '' }) => 
     toast.success('Column added');
   };
 
-  // Helper to filter tasks by search
+  // Helper to filter tasks by search and other filters
   const filterTaskIds = (taskIds: string[]) => {
-    if (!search.trim()) return taskIds;
-    const lower = search.toLowerCase();
-    return taskIds.filter((taskId) => {
-      const task = board?.tasks[taskId];
-      if (!task) return false;
-      return (
-        task.title.toLowerCase().includes(lower) ||
-        task.description.toLowerCase().includes(lower) ||
-        (task.createdBy && task.createdBy.toLowerCase().includes(lower)) ||
-        (task.assignedTo && task.assignedTo.toLowerCase().includes(lower))
-      );
-    });
+    if (!board) return taskIds;
+    
+    // Get all tasks for this column
+    const tasks = taskIds.map(taskId => board.tasks[taskId]).filter(Boolean);
+    
+    // Apply filters if provided
+    let filteredTasks = tasks;
+    if (filters) {
+      filteredTasks = filterTasks(tasks, filters);
+    }
+    
+    // Apply sorting if provided
+    if (sortOptions) {
+      filteredTasks = sortTasks(filteredTasks, sortOptions);
+    }
+    
+    // Return the filtered and sorted task IDs
+    return filteredTasks.map(task => task.id);
   };
 
   if (!board) return null;
@@ -150,20 +163,24 @@ const BoardColumns: React.FC<BoardColumnsProps> = ({ boardId, search = '' }) => 
         </SortableContext>
         <DragOverlay>
           {activeTask && (
-            <TaskCard
-              taskId={activeTask}
-              boardId={boardId}
-              columnId={findColumnIdByTaskId(activeTask) || ''}
-            />
+            <div className="transform rotate-3 scale-105 shadow-2xl">
+              <TaskCard
+                taskId={activeTask}
+                boardId={boardId}
+                columnId={findColumnIdByTaskId(activeTask) || ''}
+              />
+            </div>
           )}
         </DragOverlay>
       </DndContext>
-      {/* Add Column Button */}
-      <div className="min-w-[280px]">
-        <Button variant="outline" icon={<Plus size={16} />} onClick={() => setShowAddColumn(true)} disabled={isLoading}>
-          Add Column
-        </Button>
-      </div>
+      {/* Add Column Button - only show if user can edit */}
+      {boardAccess?.permissions.canEdit && (
+        <div className="min-w-[280px]">
+          <Button variant="outline" icon={<Plus size={16} />} onClick={() => setShowAddColumn(true)} disabled={isLoading}>
+            Add Column
+          </Button>
+        </div>
+      )}
       {/* Add Column Modal */}
       <Modal isOpen={showAddColumn} onClose={() => setShowAddColumn(false)} title="Add Column">
         <div className="space-y-4 dark:bg-secondary dark:text-white">
@@ -192,13 +209,24 @@ const DroppableColumn: React.FC<{
   activeTask: string | null;
   filteredTaskIds: string[];
 }> = ({ column, boardId, activeTask, filteredTaskIds }) => {
-  const { setNodeRef } = useDroppable({ id: column.id });
+  const { setNodeRef, isOver } = useDroppable({ id: column.id });
   return (
-    <div ref={setNodeRef} className="h-full min-w-[280px] max-w-xs">
+    <div 
+      ref={setNodeRef} 
+      className={`h-full min-w-[280px] max-w-xs transition-colors duration-200 ${
+        isOver ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+      }`}
+    >
       <Column column={column} boardId={boardId} activeTask={activeTask}>
         {filteredTaskIds.map((taskId: string) => (
           <DraggableTaskCard key={taskId} taskId={taskId} boardId={boardId} columnId={column.id} />
         ))}
+        {/* Empty state indicator for better drop detection */}
+        {filteredTaskIds.length === 0 && (
+          <div className="h-20 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 text-sm">
+            Drop tasks here
+          </div>
+        )}
       </Column>
     </div>
   );
@@ -209,7 +237,11 @@ const DraggableTaskCard: React.FC<{
   boardId: string;
   columnId: string;
 }> = ({ taskId, boardId, columnId }) => {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: taskId });
+  const { boardAccess } = useSharingStore();
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ 
+    id: taskId,
+    disabled: !boardAccess?.permissions.canEdit 
+  });
   return (
     <div
       ref={setNodeRef}
@@ -218,7 +250,9 @@ const DraggableTaskCard: React.FC<{
       style={{
         opacity: isDragging ? 0.5 : 1,
         transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+        cursor: boardAccess?.permissions.canEdit ? 'grab' : 'default',
       }}
+      className={`transition-all duration-200 ${isDragging ? 'z-50' : ''}`}
     >
       <TaskCard taskId={taskId} boardId={boardId} columnId={columnId} />
     </div>

@@ -13,7 +13,7 @@ export interface ITask {
   title: string;
   description: string;
   createdBy: mongoose.Types.ObjectId;
-  assignedTo: mongoose.Types.ObjectId;
+  assignedTo?: mongoose.Types.ObjectId;
   priority: "low" | "medium" | "high";
   dueDate: string;
   createdAt: string;
@@ -22,7 +22,7 @@ export interface ITask {
 
 export interface IBoardMember {
   userId: mongoose.Types.ObjectId;
-  role: "owner" | "admin" | "editor" | "viewer";
+  role: "owner" | "editor" | "viewer";
   invitedBy: mongoose.Types.ObjectId;
   invitedAt: string;
   joinedAt?: string;
@@ -35,18 +35,6 @@ export interface IBoardMember {
   };
 }
 
-export interface IInviteLink {
-  id: string;
-  token: string;
-  role: "admin" | "editor" | "viewer";
-  createdBy: mongoose.Types.ObjectId;
-  createdAt: string;
-  expiresAt?: string;
-  maxUses?: number;
-  usedCount: number;
-  isActive: boolean;
-}
-
 export interface IBoard extends Document {
   id: string;
   name: string;
@@ -56,11 +44,10 @@ export interface IBoard extends Document {
   createdBy: mongoose.Types.ObjectId;
   isPublic: boolean;
   members: IBoardMember[];
-  inviteLinks: IInviteLink[];
   settings: {
     allowGuestAccess: boolean;
     requireApproval: boolean;
-    defaultRole: "admin" | "editor" | "viewer";
+    defaultRole: "editor" | "viewer";
   };
   createdAt: string;
   updatedAt: string;
@@ -79,7 +66,7 @@ const taskSchema = new Schema<ITask>({
   title: { type: String, required: true },
   description: { type: String, required: true },
   createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
-  assignedTo: { type: Schema.Types.ObjectId, ref: "User", required: true },
+  assignedTo: { type: Schema.Types.ObjectId, ref: "User", required: false },
   priority: {
     type: String,
     enum: ["low", "medium", "high"],
@@ -94,7 +81,7 @@ const boardMemberSchema = new Schema<IBoardMember>({
   userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
   role: {
     type: String,
-    enum: ["owner", "admin", "editor", "viewer"],
+    enum: ["owner", "editor", "viewer"],
     default: "viewer"
   },
   invitedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
@@ -109,38 +96,30 @@ const boardMemberSchema = new Schema<IBoardMember>({
   }
 }, { _id: false });
 
-const inviteLinkSchema = new Schema<IInviteLink>({
-  id: { type: String, required: true },
-  token: { type: String, required: true, unique: true },
-  role: {
-    type: String,
-    enum: ["admin", "editor", "viewer"],
-    default: "viewer"
-  },
-  createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
-  createdAt: { type: String, required: true },
-  expiresAt: { type: String },
-  maxUses: { type: Number },
-  usedCount: { type: Number, default: 0 },
-  isActive: { type: Boolean, default: true }
-}, { _id: false });
-
 const boardSchema = new Schema<IBoard>({
   id: { type: String, required: true, unique: true },
-  name: { type: String, required: true },
+  name: { 
+    type: String, 
+    required: true,
+    validate: {
+      validator: function(v: string) {
+        return Boolean(v && v.trim().length > 0);
+      },
+      message: 'Board name cannot be empty'
+    }
+  },
   description: String,
   columns: [columnSchema],
   tasks: { type: Map, of: taskSchema, default: {} },
   createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
   isPublic: { type: Boolean, default: false },
   members: [boardMemberSchema],
-  inviteLinks: [inviteLinkSchema],
   settings: {
     allowGuestAccess: { type: Boolean, default: false },
     requireApproval: { type: Boolean, default: false },
     defaultRole: {
       type: String,
-      enum: ["admin", "editor", "viewer"],
+      enum: ["editor", "viewer"],
       default: "viewer"
     }
   },
@@ -150,6 +129,5 @@ const boardSchema = new Schema<IBoard>({
 
 // Index for efficient queries
 boardSchema.index({ "members.userId": 1 });
-boardSchema.index({ "inviteLinks.token": 1 });
 
 export default mongoose.model<IBoard>("Board", boardSchema);

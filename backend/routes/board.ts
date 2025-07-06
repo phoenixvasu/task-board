@@ -5,6 +5,7 @@ import auth from '../middleware/auth.js';
 import { v4 as uuidv4 } from 'uuid';
 import { io } from '../index.js';
 import SharingService from '../services/sharingService.js';
+import mongoose from 'mongoose';
 
 const router = express.Router();
 
@@ -49,6 +50,16 @@ router.get('/', asyncHandler(async (req: express.Request, res: express.Response)
 router.post('/', asyncHandler(async (req: express.Request, res: express.Response) => {
   const { name, description } = req.body;
   const userId = (req as any).user.id;
+  
+  // Validate required fields
+  if (!name || !name.trim()) {
+    return res.status(400).json({ message: 'Board name is required' });
+  }
+  
+  if (!userId) {
+    return res.status(400).json({ message: 'User ID is required' });
+  }
+  
   const timestamp = getCurrentTimestamp();
   const boardId = uuidv4();
   const columns = [
@@ -74,25 +85,33 @@ router.post('/', asyncHandler(async (req: express.Request, res: express.Response
       updatedAt: timestamp,
     },
   ];
-  const board = await Board.create({
-    id: boardId,
-    name,
-    description,
-    columns,
-    tasks: {},
-    createdBy: userId,
-    isPublic: false,
-    members: [],
-    inviteLinks: [],
-    settings: {
-      allowGuestAccess: false,
-      requireApproval: false,
-      defaultRole: "viewer"
-    },
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  });
-  res.status(201).json(board);
+  
+  try {
+    const board = await Board.create({
+      id: boardId,
+      name: name.trim(),
+      description: description?.trim() || '',
+      columns,
+      tasks: {},
+      createdBy: userId,
+      isPublic: false,
+      members: [],
+
+      settings: {
+        allowGuestAccess: false,
+        requireApproval: false,
+        defaultRole: "viewer"
+      },
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
+    
+    res.status(201).json(board);
+  } catch (error) {
+    console.error('Board creation failed:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    res.status(500).json({ message: 'Failed to create board', error: errorMessage });
+  }
 }));
 
 // Get board by id (with access control)
@@ -102,17 +121,19 @@ router.get('/:id', asyncHandler(async (req: express.Request, res: express.Respon
 
   // Check access permissions
   const access = await SharingService.checkBoardAccess(id, userId);
+  
   if (!access.hasAccess) {
     return res.status(403).json({ message: 'Access denied' });
   }
 
   const board = await Board.findOne({ id });
+  
   if (!board) {
     return res.status(404).json({ message: 'Board not found' });
   }
 
   // Add user role to response
-  const response = board.toObject();
+  const response = board.toObject() as any;
   response.userRole = access.role;
   response.permissions = access.permissions;
 
@@ -154,6 +175,11 @@ router.delete('/:id', asyncHandler(async (req: express.Request, res: express.Res
   const { id } = req.params;
   const userId = (req as any).user.id;
 
+  // Validate board ID
+  if (!id || !id.trim()) {
+    return res.status(400).json({ message: 'Board ID is required' });
+  }
+
   // Check if user can delete
   const canDelete = await SharingService.canPerformAction(id, userId, 'canDelete');
   if (!canDelete) {
@@ -165,16 +191,24 @@ router.delete('/:id', asyncHandler(async (req: express.Request, res: express.Res
     return res.status(404).json({ message: 'Board not found' });
   }
 
-  await board.deleteOne();
-  
-  // Emit socket event for real-time updates
-  io.to(id).emit('board-deleted', {
-    boardId: id,
-    deletedBy: (req as any).user.username,
-    timestamp: new Date().toISOString()
-  });
-  
-  res.json({ message: 'Board deleted' });
+  try {
+    await board.deleteOne();
+    
+
+    
+    // Emit socket event for real-time updates
+    io.to(id).emit('board-deleted', {
+      boardId: id,
+      deletedBy: (req as any).user.username,
+      timestamp: new Date().toISOString()
+    });
+    
+    res.json({ message: 'Board deleted successfully' });
+  } catch (error) {
+    console.error('Board deletion failed:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    res.status(500).json({ message: 'Failed to delete board', error: errorMessage });
+  }
 }));
 
 // --- COLUMN ENDPOINTS ---
@@ -333,17 +367,40 @@ router.post('/:boardId/columns/:columnId/tasks', asyncHandler(async (req: expres
 
   const timestamp = getCurrentTimestamp();
   const taskId = uuidv4();
+  
+  // Helper function to safely create ObjectId
+  const createSafeObjectId = (id: string) => {
+    try {
+      // Check if it's already a valid ObjectId
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        return new mongoose.Types.ObjectId(id);
+      }
+      // If not valid, create a new ObjectId (this will be the current user)
+      return new mongoose.Types.ObjectId();
+    } catch (error) {
+      console.error('Invalid ObjectId:', id, error);
+      return new mongoose.Types.ObjectId();
+    }
+  };
+  
+  // Validate and set default values for required fields
+  const taskCreatedBy = createdBy && createdBy.trim() ? createSafeObjectId(createdBy) : createSafeObjectId(userId);
+  const taskAssignedTo = assignedTo && assignedTo.trim() ? createSafeObjectId(assignedTo) : undefined; // Allow undefined assignment
+  const taskDescription = description && description.trim() ? description : 'Task description';
+  const taskDueDate = dueDate && dueDate.trim() ? dueDate : new Date().toISOString().split('T')[0];
+  
   const task = {
     id: taskId,
     title,
-    description,
-    createdBy,
-    assignedTo,
-    priority,
-    dueDate,
+    description: taskDescription,
+    createdBy: taskCreatedBy,
+    assignedTo: taskAssignedTo,
+    priority: priority || 'medium',
+    dueDate: taskDueDate,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
+  
   const board = await Board.findOne({ id: boardId });
   if (!board) {
     return res.status(404).json({ message: 'Board not found' });
@@ -373,6 +430,7 @@ router.post('/:boardId/columns/:columnId/tasks', asyncHandler(async (req: expres
 router.put('/:boardId/tasks/:taskId', asyncHandler(async (req: express.Request, res: express.Response) => {
   const { boardId } = req.params;
   const userId = (req as any).user.id;
+  const { assignedTo, createdBy, ...otherUpdates } = req.body;
 
   // Check if user can edit
   const canEdit = await SharingService.canPerformAction(boardId, userId, 'canEdit');
@@ -386,9 +444,48 @@ router.put('/:boardId/tasks/:taskId', asyncHandler(async (req: express.Request, 
   }
   const task = board.tasks.get(req.params.taskId);
   if (!task) return res.status(404).json({ message: 'Task not found' });
-  Object.assign(task, req.body, { updatedAt: getCurrentTimestamp() });
+
+  // Helper function to safely create ObjectId
+  const createSafeObjectId = (id: string) => {
+    try {
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        return new mongoose.Types.ObjectId(id);
+      }
+      return new mongoose.Types.ObjectId();
+    } catch (error) {
+      console.error('Invalid ObjectId:', id, error);
+      return new mongoose.Types.ObjectId();
+    }
+  };
+
+  // Prepare updates with proper ObjectId handling
+  const updates: any = {
+    ...otherUpdates,
+    updatedAt: getCurrentTimestamp()
+  };
+
+  // Handle assignedTo field
+  if (assignedTo !== undefined) {
+    if (assignedTo && assignedTo.trim()) {
+      updates.assignedTo = createSafeObjectId(assignedTo);
+    } else {
+      updates.assignedTo = null; // Allow unassigning
+    }
+  }
+
+  // Handle createdBy field
+  if (createdBy !== undefined) {
+    if (createdBy && createdBy.trim()) {
+      updates.createdBy = createSafeObjectId(createdBy);
+    } else {
+      updates.createdBy = createSafeObjectId(userId); // Default to current user
+    }
+  }
+
+  Object.assign(task, updates);
   board.tasks.set(req.params.taskId, task);
   board.updatedAt = getCurrentTimestamp();
+  
   await board.save();
   
   // Emit socket event for real-time updates
@@ -465,6 +562,60 @@ router.post('/:boardId/columns/:columnId/tasks/reorder', asyncHandler(async (req
     columnId: req.params.columnId,
     taskIds,
     reorderedBy: (req as any).user.username,
+    timestamp: new Date().toISOString()
+  });
+  
+  res.json(board);
+}));
+
+// Move task between columns (with access control)
+router.post('/:boardId/tasks/:taskId/move', asyncHandler(async (req: express.Request, res: express.Response) => {
+  const { fromColumnId, toColumnId, newIndex } = req.body;
+  const { boardId, taskId } = req.params;
+  const userId = (req as any).user.id;
+
+  // Check if user can edit
+  const canEdit = await SharingService.canPerformAction(boardId, userId, 'canEdit');
+  if (!canEdit) {
+    return res.status(403).json({ message: 'You do not have permission to edit this board' });
+  }
+
+  const board = await Board.findOne({ id: boardId });
+  if (!board) {
+    return res.status(404).json({ message: 'Board not found' });
+  }
+
+  const task = board.tasks.get(taskId);
+  if (!task) {
+    return res.status(404).json({ message: 'Task not found' });
+  }
+
+  const fromColumn = board.columns.find((col: any) => col.id === fromColumnId);
+  const toColumn = board.columns.find((col: any) => col.id === toColumnId);
+  
+  if (!fromColumn || !toColumn) {
+    return res.status(404).json({ message: 'Column not found' });
+  }
+
+  // Remove task from source column
+  fromColumn.taskIds = fromColumn.taskIds.filter((id: string) => id !== taskId);
+  fromColumn.updatedAt = getCurrentTimestamp();
+
+  // Add task to destination column at specified index
+  toColumn.taskIds.splice(newIndex, 0, taskId);
+  toColumn.updatedAt = getCurrentTimestamp();
+
+  board.updatedAt = getCurrentTimestamp();
+  await board.save();
+  
+  // Emit socket event for real-time updates
+  io.to(boardId).emit('task-moved', {
+    boardId,
+    taskId,
+    fromColumnId,
+    toColumnId,
+    newIndex,
+    movedBy: (req as any).user.username,
     timestamp: new Date().toISOString()
   });
   

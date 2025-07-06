@@ -1,7 +1,17 @@
 import { create } from 'zustand';
 import { socketService, ActiveUser } from '../api/socket';
 import { useBoardStore } from './useBoardStore';
+import { useSharingStore } from './useSharingStore';
 import toast from 'react-hot-toast';
+
+// Debounce utility
+const debounce = (func: Function, wait: number) => {
+  let timeout: NodeJS.Timeout;
+  return (...args: any[]) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(null, args), wait);
+  };
+};
 
 interface CollaborationState {
   // Active users in current board
@@ -36,6 +46,7 @@ interface CollaborationState {
   handleTaskDeleted: (data: { taskId: string; deletedBy: string; timestamp: string }) => void;
   handleColumnAdded: (data: { column: any; addedBy: string; timestamp: string }) => void;
   handleColumnDeleted: (data: { columnId: string; deletedBy: string; timestamp: string }) => void;
+  handleMemberRoleUpdated: (data: { boardId: string; userId: string; newRole: string; updatedBy: string; timestamp: string }) => void;
 }
 
 export const useCollaborationStore = create<CollaborationState>((set, get) => ({
@@ -63,7 +74,12 @@ export const useCollaborationStore = create<CollaborationState>((set, get) => ({
     return { editingUsers: newEditingUsers };
   }),
   
-  clearEditingUsers: () => set({ editingUsers: new Map() }),
+  clearEditingUsers: () => {
+    const currentState = get();
+    if (currentState.editingUsers.size > 0) {
+      set({ editingUsers: new Map() });
+    }
+  },
   
   setIsReceivingUpdates: (isReceiving) => set({ isReceivingUpdates: isReceiving }),
 
@@ -115,12 +131,22 @@ export const useCollaborationStore = create<CollaborationState>((set, get) => ({
   },
 
   // Real-time update handlers
-  handleTaskUpdated: (data) => {
+  handleTaskUpdated: debounce((data: { taskId: string; task: any; updatedBy: string; timestamp: string }) => {
     set({ isReceivingUpdates: true });
     
     // Update the task in the board store
     const boardId = socketService.getCurrentBoardId();
     if (boardId) {
+      // Check if this update is newer than what we have locally
+      const currentTask = useBoardStore.getState().getTask(boardId, data.taskId);
+      if (currentTask && currentTask.updatedAt && data.task.updatedAt) {
+        const currentTime = new Date(currentTask.updatedAt).getTime();
+        const updateTime = new Date(data.task.updatedAt).getTime();
+        if (updateTime <= currentTime) {
+          return;
+        }
+      }
+      
       useBoardStore.getState().handleRealTimeTaskUpdate(boardId, data.taskId, data.task);
     }
     
@@ -128,9 +154,9 @@ export const useCollaborationStore = create<CollaborationState>((set, get) => ({
       duration: 2000,
       position: 'top-right'
     });
-  },
+  }, 100),
 
-  handleTaskMoved: (data) => {
+  handleTaskMoved: debounce((data: { taskId: string; fromColumnId: string; toColumnId: string; newIndex: number; movedBy: string; timestamp: string }) => {
     set({ isReceivingUpdates: true });
     
     // Update task position in the board store
@@ -143,14 +169,24 @@ export const useCollaborationStore = create<CollaborationState>((set, get) => ({
       duration: 2000,
       position: 'top-right'
     });
-  },
+  }, 100),
 
-  handleColumnUpdated: (data) => {
+  handleColumnUpdated: debounce((data: { columnId: string; column: any; updatedBy: string; timestamp: string }) => {
     set({ isReceivingUpdates: true });
     
     // Update column in the board store
     const boardId = socketService.getCurrentBoardId();
     if (boardId) {
+      // Check if this update is newer than what we have locally
+      const currentColumn = useBoardStore.getState().getColumn(boardId, data.columnId);
+      if (currentColumn && currentColumn.updatedAt && data.column.updatedAt) {
+        const currentTime = new Date(currentColumn.updatedAt).getTime();
+        const updateTime = new Date(data.column.updatedAt).getTime();
+        if (updateTime <= currentTime) {
+          return;
+        }
+      }
+      
       useBoardStore.getState().handleRealTimeColumnUpdate(boardId, data.columnId, data.column);
     }
     
@@ -158,9 +194,9 @@ export const useCollaborationStore = create<CollaborationState>((set, get) => ({
       duration: 2000,
       position: 'top-right'
     });
-  },
+  }, 100),
 
-  handleColumnsReordered: (data) => {
+  handleColumnsReordered: debounce((data: { columnIds: string[]; reorderedBy: string; timestamp: string }) => {
     set({ isReceivingUpdates: true });
     
     // Update column order in the board store
@@ -173,9 +209,9 @@ export const useCollaborationStore = create<CollaborationState>((set, get) => ({
       duration: 2000,
       position: 'top-right'
     });
-  },
+  }, 100),
 
-  handleTaskAdded: (data) => {
+  handleTaskAdded: debounce((data: { columnId: string; taskId: string; task: any; addedBy: string; timestamp: string }) => {
     set({ isReceivingUpdates: true });
     
     // Add task to the board store
@@ -188,9 +224,9 @@ export const useCollaborationStore = create<CollaborationState>((set, get) => ({
       duration: 2000,
       position: 'top-right'
     });
-  },
+  }, 100),
 
-  handleTaskDeleted: (data) => {
+  handleTaskDeleted: debounce((data: { taskId: string; deletedBy: string; timestamp: string }) => {
     set({ isReceivingUpdates: true });
     
     // Remove task from the board store
@@ -203,9 +239,9 @@ export const useCollaborationStore = create<CollaborationState>((set, get) => ({
       duration: 2000,
       position: 'top-right'
     });
-  },
+  }, 100),
 
-  handleColumnAdded: (data) => {
+  handleColumnAdded: debounce((data: { column: any; addedBy: string; timestamp: string }) => {
     set({ isReceivingUpdates: true });
     
     // Add column to the board store
@@ -218,9 +254,9 @@ export const useCollaborationStore = create<CollaborationState>((set, get) => ({
       duration: 2000,
       position: 'top-right'
     });
-  },
+  }, 100),
 
-  handleColumnDeleted: (data) => {
+  handleColumnDeleted: debounce((data: { columnId: string; deletedBy: string; timestamp: string }) => {
     set({ isReceivingUpdates: true });
     
     // Remove column from the board store
@@ -233,5 +269,18 @@ export const useCollaborationStore = create<CollaborationState>((set, get) => ({
       duration: 2000,
       position: 'top-right'
     });
-  }
+  }, 100),
+
+  handleMemberRoleUpdated: debounce((data: { boardId: string; userId: string; newRole: string; updatedBy: string; timestamp: string }) => {
+    set({ isReceivingUpdates: true });
+    
+    // Refresh members list in sharing store
+    const { fetchMembers } = useSharingStore.getState();
+    fetchMembers(data.boardId);
+    
+    toast.success(`Member role updated by ${data.updatedBy}`, {
+      duration: 2000,
+      position: 'top-right'
+    });
+  }, 100)
 })); 

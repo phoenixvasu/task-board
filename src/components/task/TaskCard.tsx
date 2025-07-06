@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useBoardStore } from '../../store/useBoardStore';
+import { useSharingStore } from '../../store/useSharingStore';
 import { useDraggable } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
 import { Edit, Trash2, User, Calendar } from 'lucide-react';
@@ -20,14 +21,32 @@ interface TaskCardProps {
 }
 
 const TaskCard: React.FC<TaskCardProps> = ({ taskId, boardId }) => {
-  const { getTask, updateTask, deleteTask } = useBoardStore();
-  const { users } = useBoardStore();
+  const { getTask, updateTask, deleteTask, users, fetchUsers } = useBoardStore();
+  const { boardAccess } = useSharingStore();
   const task = getTask(boardId, taskId);
   const [showEdit, setShowEdit] = useState(false);
   const [editTask, setEditTask] = useState(task as typeof task | null);
   const [isLoading, setIsLoading] = useState(false);
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: taskId });
+
+  // Fetch users when component mounts
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  // Update editTask when task changes
+  useEffect(() => {
+    if (task) {
+      console.log('Task updated, setting editTask:', {
+        task,
+        assignedTo: task.assignedTo,
+        assignedToType: typeof task.assignedTo,
+        users: users.map(u => ({ id: u.id, name: u.name }))
+      });
+      setEditTask(task);
+    }
+  }, [task, users]);
 
   // Notify other users when editing starts/stops
   useEffect(() => {
@@ -40,11 +59,31 @@ const TaskCard: React.FC<TaskCardProps> = ({ taskId, boardId }) => {
 
   if (!task || !editTask) return null;
 
+  // Don't render if users haven't been loaded yet
+  if (users.length === 0) {
+    return (
+      <motion.div
+        ref={setNodeRef}
+        style={{
+          opacity: isDragging ? 0.5 : 1,
+          transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+        }}
+        {...attributes}
+        {...listeners}
+        layout
+        className={`bg-white dark:bg-secondary rounded-lg p-3 shadow flex flex-col gap-2 border-l-4 ${getPriorityColor(task.priority)} dark:text-white`}
+      >
+        <div className="text-center text-gray-500">Loading...</div>
+      </motion.div>
+    );
+  }
+
   const handleEditTask = async () => {
     if (!editTask || !editTask.title.trim()) {
       toast.error('Please enter a task title');
       return;
     }
+    
     setIsLoading(true);
     await updateTask(boardId, taskId, editTask);
     setShowEdit(false);
@@ -78,12 +117,24 @@ const TaskCard: React.FC<TaskCardProps> = ({ taskId, boardId }) => {
       
       <div className="flex items-center justify-between gap-2">
         <h3 className="font-semibold text-base truncate">{task.title}</h3>
-        <div className="flex gap-1">
-          <button onClick={() => setShowEdit(true)} className="text-gray-400 hover:text-primary"><Edit size={16} /></button>
-          <button onClick={handleDeleteTask} className="text-gray-400 hover:text-danger"><Trash2 size={16} /></button>
-        </div>
+        {/* Edit/Delete buttons - only show if user can edit */}
+        {boardAccess?.permissions.canEdit && (
+          <div className="flex gap-1">
+            <button onClick={() => {
+              console.log('Opening edit modal:', {
+                task,
+                editTask,
+                users: users.map(u => ({ id: u.id, name: u.name }))
+              });
+              setShowEdit(true);
+            }} className="text-gray-400 hover:text-primary"><Edit size={16} /></button>
+            <button onClick={handleDeleteTask} className="text-gray-400 hover:text-danger"><Trash2 size={16} /></button>
+          </div>
+        )}
       </div>
-      <div className="text-xs text-gray-500 mb-1">Created by {task.createdBy || 'Unknown'}</div>
+      <div className="text-xs text-gray-500 mb-1">
+        Created by {users.find(u => u.id === task.createdBy)?.name || 'Unknown'}
+      </div>
       <div className="mb-2 prose prose-sm max-w-full text-gray-700 dark:text-gray-200">
         <ReactMarkdown>{task.description || '*No description*'}</ReactMarkdown>
       </div>
@@ -128,9 +179,19 @@ const TaskCard: React.FC<TaskCardProps> = ({ taskId, boardId }) => {
               placeholder="Priority"
             />
             <Dropdown
-              options={users.map(u => ({ value: u.id, label: u.name }))}
-              value={editTask.assignedTo}
-              onChange={val => setEditTask(editTask ? { ...editTask, assignedTo: val } : null)}
+              options={[
+                { value: '', label: 'No Assignment' },
+                ...users.map(u => ({ value: u.id, label: u.name }))
+              ]}
+              value={editTask.assignedTo || ''}
+              onChange={val => {
+                console.log('Assignment dropdown changed:', {
+                  selectedValue: val,
+                  currentAssignedTo: editTask?.assignedTo,
+                  users: users.map(u => ({ id: u.id, name: u.name }))
+                });
+                setEditTask(editTask ? { ...editTask, assignedTo: val || null } : null);
+              }}
               placeholder="Assign to"
             />
             <input

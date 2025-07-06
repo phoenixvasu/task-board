@@ -1,43 +1,67 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useCollaborationStore } from '../../store/useCollaborationStore';
 import Avatar from '../ui/Avatar';
-import { Users, Circle } from 'lucide-react';
+import { Users, ChevronDown } from 'lucide-react';
 
 const ActiveUsers: React.FC = () => {
   const { activeUsers } = useCollaborationStore();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    if (dropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    } else {
+      document.removeEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [dropdownOpen]);
 
   if (activeUsers.length === 0) {
     return null;
   }
 
   return (
-    <div className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+    <div className="relative flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg" ref={dropdownRef}>
       <Users size={16} className="text-gray-500 dark:text-gray-400" />
-      <span className="text-sm text-gray-600 dark:text-gray-300">
+      <button
+        className="flex items-center text-sm text-gray-600 dark:text-gray-300 focus:outline-none"
+        onClick={() => setDropdownOpen((open) => !open)}
+        aria-haspopup="true"
+        aria-expanded={dropdownOpen}
+        title="View all active users"
+        type="button"
+      >
         {activeUsers.length} active
-      </span>
-      <div className="flex -space-x-2">
-        {activeUsers.slice(0, 5).map((user) => (
-          <div key={user.userId} className="relative" title={`${user.username} is online`}>
-            <Avatar
-              name={user.username}
-              size="sm"
-              className="border-2 border-white dark:border-gray-800"
-            />
-            <Circle
-              size={8}
-              className="absolute -bottom-0.5 -right-0.5 text-green-500 fill-current"
-            />
-          </div>
-        ))}
-        {activeUsers.length > 5 && (
-          <div className="flex items-center justify-center w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full border-2 border-white dark:border-gray-800">
-            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
-              +{activeUsers.length - 5}
-            </span>
-          </div>
-        )}
-      </div>
+        <ChevronDown size={16} className="ml-1" />
+      </button>
+      {dropdownOpen && (
+        <div className="absolute left-0 mt-2 z-50 w-64 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2 max-h-72 overflow-y-auto">
+          <div className="font-semibold text-gray-700 dark:text-gray-200 mb-2">Active Users</div>
+          <ul>
+            {activeUsers.map((user) => (
+              <li key={user.userId} className="flex items-center gap-2 py-1 px-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+                <Avatar
+                  user={{
+                    name: user.username,
+                  }}
+                  size="sm"
+                  className="border-2 border-white dark:border-gray-800"
+                />
+                <span className="text-sm text-gray-800 dark:text-gray-100">{user.username}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 };
