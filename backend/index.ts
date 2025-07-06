@@ -13,7 +13,7 @@ import cors from "cors";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import { createServer } from "http";
-import { Server } from "socket.io";
+import { Server, Socket } from "socket.io";
 import jwt from "jsonwebtoken";
 import authRoutes from "./routes/auth.js";
 import boardRoutes from "./routes/board.js";
@@ -50,7 +50,7 @@ interface ActiveUser {
 const activeUsers = new Map<string, ActiveUser>();
 
 // Socket.io authentication middleware
-io.use(async (socket, next) => {
+io.use(async (socket: Socket, next: (err?: Error) => void) => {
   const token = socket.handshake.auth.token;
   if (!token) {
     return next(new Error('Authentication error'));
@@ -89,9 +89,9 @@ io.use(async (socket, next) => {
 });
 
 // Socket.io connection handler
-io.on('connection', (socket) => {
+io.on('connection', (socket: Socket) => {
   // Join board room
-  socket.on('join-board', (data) => {
+  socket.on('join-board', (data: any) => {
     const { boardId } = data;
     socket.join(boardId);
     socket.data.currentBoardId = boardId;
@@ -117,7 +117,7 @@ io.on('connection', (socket) => {
     const room = io.sockets.adapter.rooms.get(boardId);
     if (room) {
       const activeUsersList: ActiveUser[] = [];
-      room.forEach((socketId) => {
+      room.forEach((socketId: string) => {
         const userSocket = io.sockets.sockets.get(socketId);
         if (userSocket && userSocket.data.user) {
           const activeUser = activeUsers.get(socketId);
@@ -244,7 +244,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('leave-board', (data) => {
+  socket.on('leave-board', (data: any) => {
     const { boardId } = data;
     socket.leave(boardId);
     socket.data.currentBoardId = null;
