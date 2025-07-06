@@ -26,18 +26,20 @@ router.get('/', asyncHandler(async (req: express.Request, res: express.Response)
   // Get boards created by user
   const ownedBoards = await Board.find({ createdBy: userId });
   
-  // Get boards shared with user
+  // Get boards shared with user (excluding owned boards)
   const sharedBoards = await SharingService.getSharedBoards(userId);
   
   // Combine and format results
   const allBoards = [
     ...ownedBoards.map(board => ({
       ...board.toObject(),
+      id: board.id, // Ensure consistent ID
       userRole: 'owner',
       isOwner: true
     })),
     ...sharedBoards.map(shared => ({
-      boardId: shared.boardId,
+      ...shared,
+      id: shared.boardId, // Use boardId as id for consistency
       userRole: shared.role,
       isOwner: false
     }))
@@ -50,6 +52,8 @@ router.get('/', asyncHandler(async (req: express.Request, res: express.Response)
 router.post('/', asyncHandler(async (req: express.Request, res: express.Response) => {
   const { name, description } = req.body;
   const userId = (req as any).user.id;
+  
+  console.log('Creating board:', { name, description, userId });
   
   // Validate required fields
   if (!name || !name.trim()) {
@@ -106,6 +110,7 @@ router.post('/', asyncHandler(async (req: express.Request, res: express.Response
       updatedAt: timestamp,
     });
     
+    console.log('Board created successfully:', { boardId: board.id, name: board.name });
     res.status(201).json(board);
   } catch (error) {
     console.error('Board creation failed:', error);
@@ -175,6 +180,8 @@ router.delete('/:id', asyncHandler(async (req: express.Request, res: express.Res
   const { id } = req.params;
   const userId = (req as any).user.id;
 
+  console.log('Deleting board:', { boardId: id, userId });
+
   // Validate board ID
   if (!id || !id.trim()) {
     return res.status(400).json({ message: 'Board ID is required' });
@@ -183,18 +190,21 @@ router.delete('/:id', asyncHandler(async (req: express.Request, res: express.Res
   // Check if user can delete
   const canDelete = await SharingService.canPerformAction(id, userId, 'canDelete');
   if (!canDelete) {
+    console.log('User does not have permission to delete board:', { boardId: id, userId });
     return res.status(403).json({ message: 'You do not have permission to delete this board' });
   }
 
   const board = await Board.findOne({ id });
   if (!board) {
+    console.log('Board not found for deletion:', { boardId: id });
     return res.status(404).json({ message: 'Board not found' });
   }
 
+  console.log('Found board for deletion:', { boardId: id, boardName: board.name, createdBy: board.createdBy });
+
   try {
     await board.deleteOne();
-    
-
+    console.log('Board deleted successfully:', { boardId: id });
     
     // Emit socket event for real-time updates
     io.to(id).emit('board-deleted', {

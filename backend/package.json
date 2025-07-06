@@ -2,12 +2,13 @@
     "name": "taskboard-backend",
     "version": "1.0.0",
     "main": "dist/index.js",
+    "type": "module",
     "engines": {
         "node": ">=18.0.0"
     },
     "scripts": {
         "dev": "nodemon",
-        "dev:fast": "tsx watch index.ts",
+        "dev:fast": "npx tsx watch index.ts",
         "build": "tsc",
         "start": "node dist/index.js",
         "postinstall": "npm run build"
@@ -17,7 +18,7 @@
             "**/*.ts"
         ],
         "ext": "ts,json",
-        "exec": "tsx index.ts"
+        "exec": "npx tsx index.ts"
     },
     "dependencies": {
         "@types/bcryptjs": "^2.4.6",

@@ -72,8 +72,15 @@ export const useBoardStore = create<BoardState>()(
         try {
           const token = localStorage.getItem('jwt');
           const boards = await api.get('/boards', token || undefined);
-          const boardsMap = boards.reduce((acc: Record<string, Board>, board: Board) => {
-            acc[board.id] = board;
+          const boardsMap = boards.reduce((acc: Record<string, Board>, board: any) => {
+            // Ensure we have the correct board ID
+            const boardId = board.id || board.boardId;
+            if (boardId) {
+              acc[boardId] = {
+                ...board,
+                id: boardId // Ensure consistent ID
+              };
+            }
             return acc;
           }, {});
           set({ boards: boardsMap, isLoading: false });
@@ -110,10 +117,13 @@ export const useBoardStore = create<BoardState>()(
       },
 
       deleteBoard: async (id: string) => {
+        console.log('Deleting board from store:', { boardId: id });
         const token = localStorage.getItem('jwt');
         await api.delete(`/boards/${id}`, token || undefined);
+        console.log('Board deleted from API, updating store');
         set(state => {
           const { [id]: deleted, ...remaining } = state.boards;
+          console.log('Store updated, remaining boards:', Object.keys(remaining));
           return { boards: remaining };
         });
       },

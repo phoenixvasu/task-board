@@ -314,15 +314,13 @@ export class SharingService {
   // Get boards shared with a user
   static async getSharedBoards(userId: string): Promise<any[]> {
     try {
+      // Only get boards where user is a member but NOT the owner
       const boards = await Board.find({
-        $or: [
-          { createdBy: new mongoose.Types.ObjectId(userId) },
-          { 'members.userId': new mongoose.Types.ObjectId(userId) }
-        ]
+        'members.userId': new mongoose.Types.ObjectId(userId),
+        createdBy: { $ne: new mongoose.Types.ObjectId(userId) }
       });
 
       return boards.map(board => {
-        const isOwner = board.createdBy.toString() === userId;
         const member = board.members.find(m => {
           const memberUserId = typeof m.userId === 'object' && m.userId._id 
             ? m.userId._id.toString() 
@@ -330,13 +328,19 @@ export class SharingService {
           return memberUserId === userId;
         });
 
-        const role = isOwner ? 'owner' : (member ? member.role : 'viewer');
+        const role = member ? member.role : 'viewer';
         const permissions = this.getPermissionsForRole(role);
 
         return {
           boardId: board.id,
+          name: board.name,
+          description: board.description,
           role,
-          permissions
+          permissions,
+          createdAt: board.createdAt,
+          updatedAt: board.updatedAt,
+          columns: board.columns,
+          tasks: board.tasks
         };
       });
     } catch (error) {

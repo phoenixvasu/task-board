@@ -129,6 +129,8 @@ const BoardList: React.FC = () => {
   };
 
   const handleDeleteBoard = async (boardId: string, boardName: string) => {
+    console.log('Attempting to delete board:', { boardId, boardName });
+    
     if (!boardId || !boardId.trim()) {
       toast.error('Invalid board ID');
       return;
@@ -137,7 +139,9 @@ const BoardList: React.FC = () => {
     if (window.confirm(`Are you sure you want to delete "${boardName}"?`)) {
       setIsLoading(true);
       try {
+        console.log('Calling deleteBoard with ID:', boardId);
         await deleteBoard(boardId);
+        console.log('Board deleted successfully');
         toast.success('Board deleted successfully!');
       } catch (error) {
         console.error('Board deletion error:', error);
@@ -271,7 +275,13 @@ const BoardList: React.FC = () => {
                 </thead>
                 <tbody className="bg-white dark:bg-secondary divide-y divide-gray-200 dark:divide-gray-700">
                   {Array.isArray(filteredBoards) && filteredBoards.map((board, idx) => {
-                    const boardId = board.id || board.boardId || `board-${idx}`;
+                    // Ensure we have the correct board ID
+                    const boardId = board.id || board.boardId;
+                    if (!boardId) {
+                      console.error('Board missing ID:', board);
+                      return null;
+                    }
+                    console.log('Rendering board:', { boardId, boardName: board.name, index: idx });
                     const uniqueKey = `${boardId}-${activeTab}-${idx}`;
                     
                     return (
