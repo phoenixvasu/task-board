@@ -1,113 +1,142 @@
-# Task Board Application
+# 🎯 Task Board - Real-time Collaborative Project Management
 
-A real-time collaborative task board application built with React, Node.js, and Socket.IO. Features drag-and-drop task management, role-based permissions, and live collaboration across multiple users.
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactjs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)](https://www.mongodb.com/)
 
-## ✨ Features
+A modern, real-time collaborative task board application built with React, Node.js, and Socket.IO. Features drag-and-drop task management, role-based permissions, and live collaboration across multiple users with a beautiful, responsive interface.
+
+## ✨ Key Features
+
+### 🚀 Core Functionality
 
 - **Real-time Collaboration**: Live updates across multiple users with Socket.IO
-- **Task Management**: Create, edit, and organize tasks with drag & drop
+- **Drag & Drop Interface**: Intuitive task management with smooth animations
 - **Role-based Permissions**: Owner, Editor, and Viewer roles with granular permissions
-- **User Authentication**: Secure JWT-based login and registration system
-- **Board Sharing**: Add members with different permission levels
-- **Search & Filtering**: Advanced task filtering and search capabilities
-- **Responsive Design**: Works seamlessly on desktop and mobile devices
+- **Board Sharing**: Add team members with different permission levels
+- **Task Management**: Create, edit, organize, and track tasks with priorities and due dates
+
+### 🔐 Security & Authentication
+
+- **JWT Authentication**: Secure token-based authentication with expiration
+- **Password Hashing**: Bcrypt password encryption with salt rounds
+- **Role-based Access Control**: Permission-based feature access
+- **CORS Protection**: Cross-origin request protection with configurable origins
+
+### 🎨 User Experience
+
+- **Responsive Design**: Works seamlessly on desktop, tablet, and mobile devices
 - **Dark/Light Theme**: Toggle between themes with persistent preferences
 - **Real-time Notifications**: Toast notifications for user actions
-- **Health Monitoring**: Built-in health checks and error handling
+- **Search & Filtering**: Advanced task filtering and search capabilities
+- **Smooth Animations**: Framer Motion powered transitions and interactions
+
+### 🔧 Technical Excellence
+
+- **TypeScript**: Full type safety across frontend and backend
+- **Modern Stack**: Built with latest React 18, Node.js, and MongoDB
+- **Performance Optimized**: Vite for fast development and optimized builds
+- **Health Monitoring**: Built-in health checks and comprehensive error handling
 
 ## 🛠️ Tech Stack
 
 ### Frontend
 
-- **React 18** with TypeScript for type safety
-- **Vite** for fast development and optimized builds
-- **Tailwind CSS** for utility-first styling
-- **Zustand** for lightweight state management
-- **Socket.IO Client** for real-time communication
-- **React Router** for client-side routing
-- **React Hot Toast** for user notifications
-- **Framer Motion** for smooth animations
-- **Lucide React** for beautiful icons
+| Technology           | Purpose                 | Version |
+| -------------------- | ----------------------- | ------- |
+| **React 18**         | UI Framework            | Latest  |
+| **TypeScript**       | Type Safety             | 5.x     |
+| **Vite**             | Build Tool & Dev Server | 5.x     |
+| **Tailwind CSS**     | Utility-first Styling   | 3.x     |
+| **Zustand**          | State Management        | 4.x     |
+| **Socket.IO Client** | Real-time Communication | 4.x     |
+| **React Router**     | Client-side Routing     | 6.x     |
+| **React Hot Toast**  | User Notifications      | 2.x     |
+| **Framer Motion**    | Animations              | 10.x    |
+| **Lucide React**     | Icon Library            | Latest  |
 
 ### Backend
 
-- **Node.js** with Express framework
-- **TypeScript** for type safety and better development experience
-- **Socket.IO** for real-time features and WebSocket support
-- **MongoDB** with Mongoose ODM
-- **JWT** for secure authentication
-- **bcryptjs** for password hashing
-- **CORS** enabled for cross-origin requests
-- **dotenv** for environment variable management
+| Technology     | Purpose              | Version |
+| -------------- | -------------------- | ------- |
+| **Node.js**    | Runtime Environment  | 18+     |
+| **Express**    | Web Framework        | 4.x     |
+| **TypeScript** | Type Safety          | 5.x     |
+| **Socket.IO**  | Real-time Features   | 4.x     |
+| **MongoDB**    | Database             | 6.x     |
+| **Mongoose**   | ODM                  | 8.x     |
+| **JWT**        | Authentication       | 9.x     |
+| **bcryptjs**   | Password Hashing     | 2.x     |
+| **CORS**       | Cross-origin Support | 2.x     |
 
 ## 📁 Project Structure
 
 ```
 task-board/
-├── src/                          # Frontend source code
-│   ├── components/               # React components
-│   │   ├── board/               # Board-related components
-│   │   │   └── BoardColumns.tsx # Board columns container
-│   │   ├── column/              # Column components
-│   │   │   └── Column.tsx       # Individual column component
-│   │   ├── task/                # Task components
-│   │   │   └── TaskCard.tsx     # Task card component
-│   │   ├── layout/              # Layout components
-│   │   │   └── Header.tsx       # Application header
-│   │   └── ui/                  # Reusable UI components
-│   │       ├── Avatar.tsx       # User avatar component
-│   │       ├── Button.tsx       # Button component
-│   │       ├── Dropdown.tsx     # Dropdown component
-│   │       ├── Modal.tsx        # Modal component
-│   │       └── Tag.tsx          # Tag component
-│   ├── pages/                   # Page components
-│   │   ├── BoardList.tsx        # Board listing page
-│   │   ├── BoardDetail.tsx      # Board detail page
-│   │   └── Login.tsx            # Login page
-│   ├── store/                   # State management
-│   │   ├── useAuthStore.ts      # Authentication state
-│   │   └── useBoardStore.ts     # Board state
-│   ├── api/                     # API utilities
-│   │   ├── index.ts             # API client
-│   │   └── socket.ts            # Socket.IO client
-│   ├── types/                   # TypeScript types
-│   │   └── index.ts             # Type definitions
-│   └── utils/                   # Utility functions
-│       └── index.ts             # Utility functions
-├── backend/                     # Backend source code
-│   ├── routes/                  # API routes
-│   │   ├── auth.ts              # Authentication routes
-│   │   ├── board.ts             # Board routes
-│   │   ├── user.ts              # User routes
-│   │   └── sharing.ts           # Sharing routes
-│   ├── models/                  # Database models
-│   │   ├── Board.ts             # Board model
-│   │   └── User.ts              # User model
-│   ├── services/                # Business logic
-│   │   └── sharingService.ts    # Sharing service
-│   ├── middleware/              # Express middleware
-│   │   └── auth.ts              # Authentication middleware
-│   ├── index.ts                 # Main server file
-│   ├── package.json             # Backend dependencies
-│   ├── tsconfig.json            # TypeScript config
-│   └── .env                     # Backend environment variables
-├── public/                      # Static assets
-├── index.html                   # HTML template
-├── package.json                 # Frontend dependencies
-├── vite.config.ts               # Vite configuration
-├── tailwind.config.js           # Tailwind CSS config
-├── tsconfig.json                # TypeScript config
-├── .env                         # Frontend environment variables
-├── vercel.json                  # Vercel deployment config
-└── README.md                    # This file
+├── 📁 src/                          # Frontend source code
+│   ├── 📁 components/               # React components
+│   │   ├── 📁 board/               # Board-related components
+│   │   │   └── BoardColumns.tsx    # Board columns container
+│   │   ├── 📁 column/              # Column components
+│   │   │   └── Column.tsx          # Individual column component
+│   │   ├── 📁 task/                # Task components
+│   │   │   └── TaskCard.tsx        # Task card component
+│   │   ├── 📁 layout/              # Layout components
+│   │   │   └── Header.tsx          # Application header
+│   │   └── 📁 ui/                  # Reusable UI components
+│   │       ├── Avatar.tsx          # User avatar component
+│   │       ├── Button.tsx          # Button component
+│   │       ├── Dropdown.tsx        # Dropdown component
+│   │       ├── Modal.tsx           # Modal component
+│   │       └── Tag.tsx             # Tag component
+│   ├── 📁 pages/                   # Page components
+│   │   ├── BoardList.tsx           # Board listing page
+│   │   ├── BoardDetail.tsx         # Board detail page
+│   │   └── Login.tsx               # Login page
+│   ├── 📁 store/                   # State management
+│   │   ├── useAuthStore.ts         # Authentication state
+│   │   └── useBoardStore.ts        # Board state
+│   ├── 📁 api/                     # API utilities
+│   │   └── index.ts                # API client
+│   ├── 📁 types/                   # TypeScript types
+│   │   └── index.ts                # Type definitions
+│   └── 📁 utils/                   # Utility functions
+│       └── index.ts                # Utility functions
+├── 📁 backend/                     # Backend source code
+│   ├── 📁 routes/                  # API routes
+│   │   ├── auth.ts                 # Authentication routes
+│   │   ├── board.ts                # Board routes
+│   │   ├── user.ts                 # User routes
+│   │   └── sharing.ts              # Sharing routes
+│   ├── 📁 models/                  # Database models
+│   │   ├── Board.ts                # Board model
+│   │   └── User.ts                 # User model
+│   ├── 📁 services/                # Business logic
+│   │   └── sharingService.ts       # Sharing service
+│   ├── 📁 middleware/              # Express middleware
+│   │   └── auth.ts                 # Authentication middleware
+│   ├── index.ts                    # Main server file
+│   ├── package.json                # Backend dependencies
+│   ├── tsconfig.json               # TypeScript config
+│   └── .env                        # Backend environment variables
+├── 📁 public/                      # Static assets
+├── index.html                      # HTML template
+├── package.json                    # Frontend dependencies
+├── vite.config.ts                  # Vite configuration
+├── tailwind.config.js              # Tailwind CSS config
+├── tsconfig.json                   # TypeScript config
+├── .env                            # Frontend environment variables
+├── vercel.json                     # Vercel deployment config
+└── README.md                       # This file
 ```
 
-## 🚀 Getting Started
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- **Node.js** (v18 or higher)
-- **MongoDB** (local or cloud instance - MongoDB Atlas recommended)
+- **Node.js** (v18 or higher) - [Download](https://nodejs.org/)
+- **MongoDB** (local or cloud instance) - [MongoDB Atlas](https://www.mongodb.com/atlas) recommended
 - **npm** or **yarn** package manager
 - **Git** for version control
 
@@ -141,6 +170,7 @@ task-board/
    MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/taskboard
    JWT_SECRET=your-super-secret-jwt-key-here
    CORS_ORIGIN=http://localhost:3000
+   NODE_ENV=development
    ```
 
    **Frontend** (create `.env` in root):
@@ -161,122 +191,145 @@ task-board/
    ```
 
 5. **Access the application**:
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:5000
-   - Health Check: http://localhost:5000/api/health
+   - 🌐 Frontend: http://localhost:3000
+   - 🔌 Backend API: http://localhost:5000
+   - 💚 Health Check: http://localhost:5000/api/health
 
-## 📖 Usage
+## 📖 User Guide
 
-### Authentication
+### 🔐 Authentication
 
-1. **Register a new account**:
+#### Registration
 
-   - Navigate to the signup page
-   - Enter your email, username, and password
-   - Verify your account and login
+1. Navigate to the signup page
+2. Enter your email, username, and password
+3. Verify your account and login
 
-2. **Login**:
-   - Use your credentials to login
-   - Access your dashboard with all your boards
+#### Login
 
-### Board Management
+1. Use your credentials to login
+2. Access your dashboard with all your boards
+3. JWT tokens are automatically managed
 
-1. **Create a board**:
+### 📋 Board Management
 
-   - Click "Create Board" button
-   - Enter board name and description
-   - Start organizing tasks immediately
+#### Creating Boards
 
-2. **Add columns**:
+1. Click "Create Board" button
+2. Enter board name and description
+3. Start organizing tasks immediately
 
-   - Use the "Add Column" button
-   - Create workflow columns (e.g., To Do, In Progress, Done)
-   - Reorder columns by dragging
+#### Adding Columns
 
-3. **Create tasks**:
-   - Click "Add Task" in any column
-   - Fill in task details (title, description, priority, due date)
-   - Assign to team members
-   - Set priority levels (Low, Medium, High)
+1. Use the "Add Column" button
+2. Create workflow columns (e.g., To Do, In Progress, Done)
+3. Reorder columns by dragging
 
-### Collaboration & Permissions
+#### Creating Tasks
 
-1. **Share boards**:
+1. Click "Add Task" in any column
+2. Fill in task details:
+   - **Title**: Task name
+   - **Description**: Detailed description
+   - **Priority**: Low, Medium, High
+   - **Due Date**: Set deadlines
+   - **Assignee**: Assign to team members
 
-   - Click the "Share" button on any board
-   - Add team members by email
-   - Set appropriate roles:
-     - **Owner**: Full control, can manage members and delete board
-     - **Editor**: Can edit tasks, columns, and board settings
-     - **Viewer**: Read-only access to view tasks and board
+### 👥 Collaboration & Permissions
 
-2. **Real-time updates**:
-   - Changes appear instantly for all users
-   - See who's currently viewing the board
-   - Monitor connection status
-   - Real-time notifications for all actions
+#### Sharing Boards
 
-### Task Management
+1. Click the "Share" button on any board
+2. Add team members by email
+3. Set appropriate roles:
 
-1. **Drag & Drop**:
+| Role       | Permissions                                       |
+| ---------- | ------------------------------------------------- |
+| **Owner**  | Full control, can manage members and delete board |
+| **Editor** | Can edit tasks, columns, and board settings       |
+| **Viewer** | Read-only access to view tasks and board          |
 
-   - Move tasks between columns
-   - Reorder tasks within columns
-   - Real-time synchronization across all users
+#### Real-time Features
 
-2. **Task Details**:
+- ✅ Changes appear instantly for all users
+- 👥 See who's currently viewing the board
+- 📡 Monitor connection status
+- 🔔 Real-time notifications for all actions
 
-   - Click on tasks to edit
-   - Set priorities and due dates
-   - Assign to team members
-   - Add descriptions and notes
+### 🎯 Task Management
 
-3. **Search & Filter**:
-   - Use the search bar to find tasks
-   - Filter by priority, assignee, or due date
-   - Sort tasks by various criteria
+#### Drag & Drop
 
-## 🔌 API Endpoints
+- 🖱️ Move tasks between columns
+- 📝 Reorder tasks within columns
+- ⚡ Real-time synchronization across all users
 
-### Authentication
+#### Task Details
 
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/login` - User login
-- `GET /api/auth/profile` - Get user profile
-- `PUT /api/auth/profile` - Update user profile
+- ✏️ Click on tasks to edit
+- 🏷️ Set priorities and due dates
+- 👤 Assign to team members
+- 📄 Add descriptions and notes
 
-### Boards
+#### Search & Filter
 
-- `GET /api/boards` - Get user's boards
-- `POST /api/boards` - Create new board
-- `GET /api/boards/:id` - Get board details
-- `PUT /api/boards/:id` - Update board
-- `DELETE /api/boards/:id` - Delete board
+- 🔍 Use the search bar to find tasks
+- 🎛️ Filter by priority, assignee, or due date
+- 📊 Sort tasks by various criteria
 
-### Tasks
+## 🔌 API Reference
 
-- `POST /api/boards/:boardId/tasks` - Create task
-- `PUT /api/boards/:boardId/tasks/:taskId` - Update task
-- `DELETE /api/boards/:boardId/tasks/:taskId` - Delete task
-- `POST /api/boards/:boardId/tasks/:taskId/move` - Move task between columns
+### Authentication Endpoints
 
-### Columns
+| Method | Endpoint             | Description         |
+| ------ | -------------------- | ------------------- |
+| `POST` | `/api/auth/register` | User registration   |
+| `POST` | `/api/auth/login`    | User login          |
+| `GET`  | `/api/auth/profile`  | Get user profile    |
+| `PUT`  | `/api/auth/profile`  | Update user profile |
 
-- `POST /api/boards/:boardId/columns` - Create column
-- `PUT /api/boards/:boardId/columns/:columnId` - Update column
-- `DELETE /api/boards/:boardId/columns/:columnId` - Delete column
-- `POST /api/boards/:boardId/columns/:columnId/tasks/reorder` - Reorder tasks in column
+### Board Endpoints
 
-### Sharing
+| Method   | Endpoint          | Description       |
+| -------- | ----------------- | ----------------- |
+| `GET`    | `/api/boards`     | Get user's boards |
+| `POST`   | `/api/boards`     | Create new board  |
+| `GET`    | `/api/boards/:id` | Get board details |
+| `PUT`    | `/api/boards/:id` | Update board      |
+| `DELETE` | `/api/boards/:id` | Delete board      |
 
-- `GET /api/sharing/boards/:boardId/members` - Get board members
-- `POST /api/sharing/boards/:boardId/members` - Add member
-- `DELETE /api/sharing/boards/:boardId/members/:userId` - Remove member
-- `PUT /api/sharing/boards/:boardId/members/:userId/role` - Update member role
+### Task Endpoints
+
+| Method   | Endpoint                                  | Description               |
+| -------- | ----------------------------------------- | ------------------------- |
+| `POST`   | `/api/boards/:boardId/tasks`              | Create task               |
+| `PUT`    | `/api/boards/:boardId/tasks/:taskId`      | Update task               |
+| `DELETE` | `/api/boards/:boardId/tasks/:taskId`      | Delete task               |
+| `POST`   | `/api/boards/:boardId/tasks/:taskId/move` | Move task between columns |
+
+### Column Endpoints
+
+| Method   | Endpoint                                               | Description             |
+| -------- | ------------------------------------------------------ | ----------------------- |
+| `POST`   | `/api/boards/:boardId/columns`                         | Create column           |
+| `PUT`    | `/api/boards/:boardId/columns/:columnId`               | Update column           |
+| `DELETE` | `/api/boards/:boardId/columns/:columnId`               | Delete column           |
+| `POST`   | `/api/boards/:boardId/columns/:columnId/tasks/reorder` | Reorder tasks in column |
+
+### Sharing Endpoints
+
+| Method   | Endpoint                                            | Description        |
+| -------- | --------------------------------------------------- | ------------------ |
+| `GET`    | `/api/sharing/boards/:boardId/members`              | Get board members  |
+| `POST`   | `/api/sharing/boards/:boardId/members`              | Add member         |
+| `DELETE` | `/api/sharing/boards/:boardId/members/:userId`      | Remove member      |
+| `PUT`    | `/api/sharing/boards/:boardId/members/:userId/role` | Update member role |
 
 ### Health Check
 
-- `GET /api/health` - Server health status
+| Method | Endpoint      | Description          |
+| ------ | ------------- | -------------------- |
+| `GET`  | `/api/health` | Server health status |
 
 ## 🗄️ Database Schema
 
@@ -350,48 +403,62 @@ task-board/
 
 ### Socket.IO Events
 
-#### Client to Server
+#### Client to Server Events
 
-- `join-board` - Join a board room
-- `leave-board` - Leave a board room
-- `task-added` - Create a new task
-- `task-updated` - Update an existing task
-- `task-deleted` - Delete a task
-- `task-moved` - Move task between columns
-- `column-added` - Create a new column
-- `column-updated` - Update column details
-- `column-deleted` - Delete a column
-- `user-editing` - User is editing a task
-- `activity` - User activity heartbeat
+| Event            | Description               | Payload                                                                                       |
+| ---------------- | ------------------------- | --------------------------------------------------------------------------------------------- |
+| `join-board`     | Join a board room         | `{ boardId: string, userId: string }`                                                         |
+| `leave-board`    | Leave a board room        | `{ boardId: string, userId: string }`                                                         |
+| `task-added`     | Create a new task         | `{ boardId: string, task: Task }`                                                             |
+| `task-updated`   | Update an existing task   | `{ boardId: string, taskId: string, updates: Partial<Task> }`                                 |
+| `task-deleted`   | Delete a task             | `{ boardId: string, taskId: string }`                                                         |
+| `task-moved`     | Move task between columns | `{ boardId: string, taskId: string, fromColumn: string, toColumn: string, position: number }` |
+| `column-added`   | Create a new column       | `{ boardId: string, column: Column }`                                                         |
+| `column-updated` | Update column details     | `{ boardId: string, columnId: string, updates: Partial<Column> }`                             |
+| `column-deleted` | Delete a column           | `{ boardId: string, columnId: string }`                                                       |
+| `user-editing`   | User is editing a task    | `{ boardId: string, taskId: string, userId: string }`                                         |
+| `activity`       | User activity heartbeat   | `{ boardId: string, userId: string }`                                                         |
 
-#### Server to Client
+#### Server to Client Events
 
-- `user-joined` - New user joined the board
-- `user-left` - User left the board
-- `active-users` - List of active users
-- `task-created` - New task created
-- `task-updated` - Task updated
-- `task-deleted` - Task deleted
-- `task-moved` - Task moved
-- `column-created` - New column created
-- `column-updated` - Column updated
-- `column-deleted` - Column deleted
-- `board-updated` - Board details updated
-- `board-deleted` - Board deleted
+| Event            | Description               | Payload                                                                      |
+| ---------------- | ------------------------- | ---------------------------------------------------------------------------- |
+| `user-joined`    | New user joined the board | `{ userId: string, user: User }`                                             |
+| `user-left`      | User left the board       | `{ userId: string }`                                                         |
+| `active-users`   | List of active users      | `{ users: User[] }`                                                          |
+| `task-created`   | New task created          | `{ task: Task }`                                                             |
+| `task-updated`   | Task updated              | `{ taskId: string, updates: Partial<Task> }`                                 |
+| `task-deleted`   | Task deleted              | `{ taskId: string }`                                                         |
+| `task-moved`     | Task moved                | `{ taskId: string, fromColumn: string, toColumn: string, position: number }` |
+| `column-created` | New column created        | `{ column: Column }`                                                         |
+| `column-updated` | Column updated            | `{ columnId: string, updates: Partial<Column> }`                             |
+| `column-deleted` | Column deleted            | `{ columnId: string }`                                                       |
+| `board-updated`  | Board details updated     | `{ boardId: string, updates: Partial<Board> }`                               |
+| `board-deleted`  | Board deleted             | `{ boardId: string }`                                                        |
 
 ## 🔒 Security Features
 
+### Authentication & Authorization
+
 - **JWT Authentication**: Secure token-based authentication with expiration
 - **Password Hashing**: Bcrypt password encryption with salt rounds
+- **Role-based Access Control**: Permission-based feature access
+- **Session Management**: Secure session handling and token refresh
+
+### Data Protection
+
 - **CORS Protection**: Cross-origin request protection with configurable origins
 - **Input Validation**: Server-side data validation and sanitization
-- **Role-based Access Control**: Permission-based feature access
 - **MongoDB Injection Protection**: Mongoose query sanitization
 - **XSS Protection**: Input sanitization and output encoding
+
+### Environment Security
+
 - **Environment Variable Security**: Sensitive data stored in environment variables
 - **Error Handling**: Comprehensive error handling without exposing sensitive information
+- **Request Rate Limiting**: Protection against brute force attacks
 
-## 🚀 Deployment
+## 🚀 Deployment Guide
 
 ### Backend Deployment (Render)
 
@@ -403,10 +470,11 @@ task-board/
    - **Environment**: `Node`
    - **Build Command**: `npm install && npm run build`
    - **Start Command**: `npm start`
+   - **Root Directory**: `backend`
 
 3. **Configure environment variables** in Render dashboard:
 
-   ```
+   ```bash
    MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/taskboard
    JWT_SECRET=your-super-secret-jwt-key-here
    CORS_ORIGIN=https://your-frontend-domain.vercel.app
@@ -421,7 +489,7 @@ task-board/
 
 2. **Configure environment variables** in Vercel dashboard:
 
-   ```
+   ```bash
    VITE_API_URL=https://your-backend-url.onrender.com/api
    ```
 
@@ -434,17 +502,17 @@ task-board/
 #### Backend (.env)
 
 ```bash
-# Database
+# Database Configuration
 MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/taskboard
 
 # Authentication
 JWT_SECRET=your-super-secret-jwt-key-here
 
-# Server
+# Server Configuration
 PORT=5000
 NODE_ENV=production
 
-# CORS (comma-separated for multiple origins)
+# CORS Configuration (comma-separated for multiple origins)
 CORS_ORIGIN=https://your-frontend-domain.vercel.app
 ```
 
@@ -455,15 +523,17 @@ CORS_ORIGIN=https://your-frontend-domain.vercel.app
 VITE_API_URL=https://your-backend-url.onrender.com/api
 ```
 
-### Troubleshooting Deployment
+### Deployment Troubleshooting
 
 #### Common Issues:
 
-1. **CORS Errors**: Ensure `CORS_ORIGIN` is set correctly in backend
-2. **Build Failures**: Check Node.js version compatibility (v18+)
-3. **Database Connection**: Verify MongoDB URI and network access
-4. **Environment Variables**: Ensure all required variables are set in deployment platform
-5. **Port Issues**: Render automatically sets PORT, don't override
+| Issue                     | Solution                                                     |
+| ------------------------- | ------------------------------------------------------------ |
+| **CORS Errors**           | Ensure `CORS_ORIGIN` is set correctly in backend             |
+| **Build Failures**        | Check Node.js version compatibility (v18+)                   |
+| **Database Connection**   | Verify MongoDB URI and network access                        |
+| **Environment Variables** | Ensure all required variables are set in deployment platform |
+| **Port Issues**           | Render automatically sets PORT, don't override               |
 
 ## 💻 Development
 
@@ -487,7 +557,7 @@ npm start            # Start production server
 npm run lint         # Run ESLint
 ```
 
-### Code Style
+### Code Style Guidelines
 
 - **TypeScript**: Strict type checking enabled
 - **ESLint**: Code linting and formatting
@@ -505,13 +575,49 @@ npm run lint         # Run ESLint
 
 ## 🧪 Testing
 
-See [QUICK_START_TESTING.md](./QUICK_START_TESTING.md) for comprehensive testing guidelines including:
+### Manual Testing Checklist
 
-- Manual testing procedures
-- Feature testing checklist
-- Common issues and solutions
-- Performance testing
-- Security testing
+#### Authentication
+
+- [ ] User registration
+- [ ] User login/logout
+- [ ] Password validation
+- [ ] JWT token management
+
+#### Board Management
+
+- [ ] Create new boards
+- [ ] Edit board details
+- [ ] Delete boards
+- [ ] Board sharing
+
+#### Task Management
+
+- [ ] Create tasks
+- [ ] Edit task details
+- [ ] Delete tasks
+- [ ] Move tasks between columns
+- [ ] Task filtering and search
+
+#### Real-time Features
+
+- [ ] Live updates across users
+- [ ] User presence indicators
+- [ ] Real-time notifications
+- [ ] Connection status
+
+#### Permissions
+
+- [ ] Role-based access control
+- [ ] Permission validation
+- [ ] Member management
+
+### Performance Testing
+
+- [ ] Load testing with multiple users
+- [ ] Database query optimization
+- [ ] Real-time connection stability
+- [ ] Memory usage monitoring
 
 ## 🤝 Contributing
 
@@ -539,6 +645,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🆘 Support
 
+### Getting Help
+
 For support and questions:
 
 - **Create an issue** in the repository
@@ -548,12 +656,31 @@ For support and questions:
 
 ### Common Support Topics
 
-- **Authentication Issues**: Check JWT_SECRET and token expiration
-- **Real-time Issues**: Verify Socket.IO connection and CORS settings
-- **Permission Issues**: Check user roles and board access
-- **Deployment Issues**: Verify environment variables and build commands
+| Issue                     | Solution                                        |
+| ------------------------- | ----------------------------------------------- |
+| **Authentication Issues** | Check JWT_SECRET and token expiration           |
+| **Real-time Issues**      | Verify Socket.IO connection and CORS settings   |
+| **Permission Issues**     | Check user roles and board access               |
+| **Deployment Issues**     | Verify environment variables and build commands |
+| **Database Issues**       | Check MongoDB connection and network access     |
+
+### Performance Optimization
+
+- **Database Indexing**: Ensure proper indexes on frequently queried fields
+- **Caching**: Implement Redis for session storage (optional)
+- **CDN**: Use CDN for static assets
+- **Compression**: Enable gzip compression
+- **Monitoring**: Implement application monitoring
 
 ---
 
+<div align="center">
+
 **Built with ❤️ using React, Node.js, and Socket.IO**
 
+[![GitHub stars](https://img.shields.io/github/stars/yourusername/task-board?style=social)](https://github.com/yourusername/task-board)
+[![GitHub forks](https://img.shields.io/github/forks/yourusername/task-board?style=social)](https://github.com/yourusername/task-board)
+[![GitHub issues](https://img.shields.io/github/issues/yourusername/task-board)](https://github.com/yourusername/task-board/issues)
+[![GitHub pull requests](https://img.shields.io/github/issues-pr/yourusername/task-board)](https://github.com/yourusername/task-board/pulls)
+
+</div>

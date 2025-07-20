@@ -3,14 +3,16 @@ import Board from '../models/Board.js';
 import User from '../models/User.js';
 import auth from '../middleware/auth.js';
 import { v4 as uuidv4 } from 'uuid';
-import { io } from '../index.js';
 import SharingService from '../services/sharingService.js';
 import mongoose from 'mongoose';
+import { ITask } from '../models/Board';
+import { getIO } from '../services/socketService';
+import { SOCKET_EVENTS } from '../../src/types/socketEvents';
 
 const router = express.Router();
 
 // Helper: generate timestamp
-const getCurrentTimestamp = (): string => new Date().toISOString();
+const getCurrentTimestamp = (): Date => new Date();
 
 // Async handler utility for Express
 const asyncHandler = (fn: Function) => (req: any, res: any, next: any) =>
@@ -32,7 +34,7 @@ router.get('/', asyncHandler(async (req: express.Request, res: express.Response)
   // Combine and format results
   const allBoards = [
     ...ownedBoards.map(board => ({
-      ...board.toObject(),
+      ...board.toJSON(),
       id: board.id, // Ensure consistent ID
       userRole: 'owner',
       isOwner: true
@@ -48,12 +50,37 @@ router.get('/', asyncHandler(async (req: express.Request, res: express.Response)
   res.json(allBoards);
 }));
 
+// Get only boards owned by the user
+router.get('/owned', asyncHandler(async (req: express.Request, res: express.Response) => {
+  const userId = (req as any).user.id;
+  const ownedBoards = await Board.find({ createdBy: userId });
+  res.json(ownedBoards.map(board => ({
+    ...board.toJSON(),
+    id: board.id,
+    userRole: 'owner',
+    isOwner: true
+  })));
+}));
+
+// Get only boards shared with the user (not owned)
+router.get('/shared', asyncHandler(async (req: express.Request, res: express.Response) => {
+  const userId = (req as any).user.id;
+  const sharedBoards = await SharingService.getSharedBoards(userId);
+  // Exclude boards where the user is the owner
+  const ownedBoardIds = (await Board.find({ createdBy: userId })).map(b => b.id);
+  const filtered = sharedBoards.filter(b => !ownedBoardIds.includes(b.boardId));
+  res.json(filtered.map(shared => ({
+    ...shared,
+    id: shared.boardId,
+    userRole: shared.role,
+    isOwner: false
+  })));
+}));
+
 // Create board
 router.post('/', asyncHandler(async (req: express.Request, res: express.Response) => {
   const { name, description } = req.body;
   const userId = (req as any).user.id;
-  
-  console.log('Creating board:', { name, description, userId });
   
   // Validate required fields
   if (!name || !name.trim()) {
@@ -110,10 +137,9 @@ router.post('/', asyncHandler(async (req: express.Request, res: express.Response
       updatedAt: timestamp,
     });
     
-    console.log('Board created successfully:', { boardId: board.id, name: board.name });
-    res.status(201).json(board);
+    // No socket event needed for board creation; only owner sees it
+    res.status(201).json(board.toJSON());
   } catch (error) {
-    console.error('Board creation failed:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     res.status(500).json({ message: 'Failed to create board', error: errorMessage });
   }
@@ -138,7 +164,7 @@ router.get('/:id', asyncHandler(async (req: express.Request, res: express.Respon
   }
 
   // Add user role to response
-  const response = board.toObject() as any;
+  const response = board.toJSON();
   response.userRole = access.role;
   response.permissions = access.permissions;
 
@@ -163,24 +189,24 @@ router.put('/:id', asyncHandler(async (req: express.Request, res: express.Respon
 
   Object.assign(board, req.body, { updatedAt: getCurrentTimestamp() });
   await board.save();
-  
-  // Emit socket event for real-time updates
-  io.to(id).emit('board-updated', {
-    boardId: id,
-    board: board.toObject(),
-    updatedBy: (req as any).user.username,
-    timestamp: new Date().toISOString()
-  });
-  
-  res.json(board);
+
+  // Emit real-time update to all board members
+  const io = getIO && getIO();
+  if (io) {
+    io.to(board.id).emit(SOCKET_EVENTS.BOARD_UPDATED, {
+      boardId: board.id,
+      updates: req.body,
+      sourceClientId: req.headers['x-client-id'] || null,
+    });
+  }
+
+  res.json(board.toJSON());
 }));
 
 // Delete board (with access control)
 router.delete('/:id', asyncHandler(async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
   const userId = (req as any).user.id;
-
-  console.log('Deleting board:', { boardId: id, userId });
 
   // Validate board ID
   if (!id || !id.trim()) {
@@ -190,32 +216,19 @@ router.delete('/:id', asyncHandler(async (req: express.Request, res: express.Res
   // Check if user can delete
   const canDelete = await SharingService.canPerformAction(id, userId, 'canDelete');
   if (!canDelete) {
-    console.log('User does not have permission to delete board:', { boardId: id, userId });
     return res.status(403).json({ message: 'You do not have permission to delete this board' });
   }
 
   const board = await Board.findOne({ id });
   if (!board) {
-    console.log('Board not found for deletion:', { boardId: id });
     return res.status(404).json({ message: 'Board not found' });
   }
 
-  console.log('Found board for deletion:', { boardId: id, boardName: board.name, createdBy: board.createdBy });
-
   try {
     await board.deleteOne();
-    console.log('Board deleted successfully:', { boardId: id });
-    
-    // Emit socket event for real-time updates
-    io.to(id).emit('board-deleted', {
-      boardId: id,
-      deletedBy: (req as any).user.username,
-      timestamp: new Date().toISOString()
-    });
     
     res.json({ message: 'Board deleted successfully' });
   } catch (error) {
-    console.error('Board deletion failed:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     res.status(500).json({ message: 'Failed to delete board', error: errorMessage });
   }
@@ -251,15 +264,7 @@ router.post('/:boardId/columns', asyncHandler(async (req: express.Request, res: 
   board.updatedAt = timestamp;
   await board.save();
   
-  // Emit socket event for real-time updates
-  io.to(boardId).emit('column-added', {
-    boardId,
-    column,
-    addedBy: (req as any).user.username,
-    timestamp: new Date().toISOString()
-  });
-  
-  res.status(201).json(board);
+  res.status(201).json(board.toJSON());
 }));
 
 // Update column (with access control)
@@ -287,16 +292,7 @@ router.put('/:boardId/columns/:columnId', asyncHandler(async (req: express.Reque
   board.updatedAt = timestamp;
   await board.save();
   
-  // Emit socket event for real-time updates
-  io.to(boardId).emit('column-updated', {
-    boardId,
-    columnId: req.params.columnId,
-    column,
-    updatedBy: (req as any).user.username,
-    timestamp: new Date().toISOString()
-  });
-  
-  res.json(board);
+  res.json(board.toJSON());
 }));
 
 // Delete column (with access control)
@@ -318,15 +314,7 @@ router.delete('/:boardId/columns/:columnId', asyncHandler(async (req: express.Re
   board.updatedAt = getCurrentTimestamp();
   await board.save();
   
-  // Emit socket event for real-time updates
-  io.to(boardId).emit('column-deleted', {
-    boardId,
-    columnId: req.params.columnId,
-    deletedBy: (req as any).user.username,
-    timestamp: new Date().toISOString()
-  });
-  
-  res.json(board);
+  res.json(board.toJSON());
 }));
 
 // Reorder columns (with access control)
@@ -350,15 +338,7 @@ router.post('/:boardId/columns/reorder', asyncHandler(async (req: express.Reques
   board.updatedAt = getCurrentTimestamp();
   await board.save();
   
-  // Emit socket event for real-time updates
-  io.to(boardId).emit('columns-reordered', {
-    boardId,
-    columnIds,
-    reorderedBy: (req as any).user.username,
-    timestamp: new Date().toISOString()
-  });
-  
-  res.json(board);
+  res.json(board.toJSON());
 }));
 
 // --- TASK ENDPOINTS ---
@@ -366,74 +346,51 @@ router.post('/:boardId/columns/reorder', asyncHandler(async (req: express.Reques
 // Add task (with access control)
 router.post('/:boardId/columns/:columnId/tasks', asyncHandler(async (req: express.Request, res: express.Response) => {
   const { title, description, createdBy, assignedTo, priority, dueDate } = req.body;
-  const { boardId } = req.params;
+  const { boardId, columnId } = req.params;
   const userId = (req as any).user.id;
+
+  // Validation
+  if (!title || typeof title !== 'string' || !title.trim()) {
+    return res.status(400).json({ message: 'Task title is required.' });
+  }
 
   // Check if user can edit
   const canEdit = await SharingService.canPerformAction(boardId, userId, 'canEdit');
   if (!canEdit) {
     return res.status(403).json({ message: 'You do not have permission to edit this board' });
   }
-
-  const timestamp = getCurrentTimestamp();
-  const taskId = uuidv4();
-  
-  // Helper function to safely create ObjectId
-  const createSafeObjectId = (id: string) => {
-    try {
-      // Check if it's already a valid ObjectId
-      if (mongoose.Types.ObjectId.isValid(id)) {
-        return new mongoose.Types.ObjectId(id);
-      }
-      // If not valid, create a new ObjectId (this will be the current user)
-      return new mongoose.Types.ObjectId();
-    } catch (error) {
-      console.error('Invalid ObjectId:', id, error);
-      return new mongoose.Types.ObjectId();
-    }
-  };
-  
-  // Validate and set default values for required fields
-  const taskCreatedBy = createdBy && createdBy.trim() ? createSafeObjectId(createdBy) : createSafeObjectId(userId);
-  const taskAssignedTo = assignedTo && assignedTo.trim() ? createSafeObjectId(assignedTo) : undefined; // Allow undefined assignment
-  const taskDescription = description && description.trim() ? description : 'Task description';
-  const taskDueDate = dueDate && dueDate.trim() ? dueDate : new Date().toISOString().split('T')[0];
-  
-  const task = {
-    id: taskId,
-    title,
-    description: taskDescription,
-    createdBy: taskCreatedBy,
-    assignedTo: taskAssignedTo,
-    priority: priority || 'medium',
-    dueDate: taskDueDate,
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  };
   
   const board = await Board.findOne({ id: boardId });
   if (!board) {
     return res.status(404).json({ message: 'Board not found' });
   }
-  board.tasks.set(taskId, task);
-  const column = board.columns.find((col: any) => col.id === req.params.columnId);
-  if (!column) return res.status(404).json({ message: 'Column not found' });
-  column.taskIds.push(taskId);
-  column.updatedAt = timestamp;
-  board.updatedAt = timestamp;
+  const column = board.columns.find((col: any) => col.id === columnId);
+  if (!column) {
+    return res.status(404).json({ message: 'Column not found' });
+  }
+
+  const taskObjectId = new mongoose.Types.ObjectId();
+  const now = new Date();
+  const task: ITask = {
+    id: taskObjectId.toString(),
+    title: title.trim(),
+    description: description && typeof description === 'string' ? description : '',
+    createdBy: createdBy ? new mongoose.Types.ObjectId(createdBy) : new mongoose.Types.ObjectId(userId),
+    assignedTo: assignedTo ? new mongoose.Types.ObjectId(assignedTo) : undefined,
+    priority: priority === 'low' || priority === 'high' ? priority : 'medium',
+    dueDate: dueDate ? new Date(dueDate) : now,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  // Add to board.tasks and column.taskIds
+  board.tasks.set(taskObjectId.toString(), task);
+  column.taskIds.push(taskObjectId.toString());
+  board.updatedAt = now;
+  board.markModified('tasks');
   await board.save();
   
-  // Emit socket event for real-time updates
-  io.to(boardId).emit('task-added', {
-    boardId,
-    columnId: req.params.columnId,
-    taskId,
-    task,
-    addedBy: (req as any).user.username,
-    timestamp: new Date().toISOString()
-  });
-  
-  res.status(201).json(board);
+  return res.status(201).json({ task });
 }));
 
 // Update task (with access control)
@@ -498,16 +455,7 @@ router.put('/:boardId/tasks/:taskId', asyncHandler(async (req: express.Request, 
   
   await board.save();
   
-  // Emit socket event for real-time updates
-  io.to(boardId).emit('task-updated', {
-    boardId,
-    taskId: req.params.taskId,
-    task,
-    updatedBy: (req as any).user.username,
-    timestamp: new Date().toISOString()
-  });
-  
-  res.json(board);
+  res.json(board.toJSON());
 }));
 
 // Delete task (with access control)
@@ -532,15 +480,7 @@ router.delete('/:boardId/tasks/:taskId', asyncHandler(async (req: express.Reques
   board.updatedAt = getCurrentTimestamp();
   await board.save();
   
-  // Emit socket event for real-time updates
-  io.to(boardId).emit('task-deleted', {
-    boardId,
-    taskId: req.params.taskId,
-    deletedBy: (req as any).user.username,
-    timestamp: new Date().toISOString()
-  });
-  
-  res.json(board);
+  res.json(board.toJSON());
 }));
 
 // Move/reorder tasks in a column (with access control)
@@ -566,16 +506,7 @@ router.post('/:boardId/columns/:columnId/tasks/reorder', asyncHandler(async (req
   board.updatedAt = getCurrentTimestamp();
   await board.save();
   
-  // Emit socket event for real-time updates
-  io.to(boardId).emit('tasks-reordered', {
-    boardId,
-    columnId: req.params.columnId,
-    taskIds,
-    reorderedBy: (req as any).user.username,
-    timestamp: new Date().toISOString()
-  });
-  
-  res.json(board);
+  res.json(board.toJSON());
 }));
 
 // Move task between columns (with access control)
@@ -618,18 +549,7 @@ router.post('/:boardId/tasks/:taskId/move', asyncHandler(async (req: express.Req
   board.updatedAt = getCurrentTimestamp();
   await board.save();
   
-  // Emit socket event for real-time updates
-  io.to(boardId).emit('task-moved', {
-    boardId,
-    taskId,
-    fromColumnId,
-    toColumnId,
-    newIndex,
-    movedBy: (req as any).user.username,
-    timestamp: new Date().toISOString()
-  });
-  
-  res.json(board);
+  res.json(board.toJSON());
 }));
 
 export default router;

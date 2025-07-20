@@ -4,8 +4,8 @@ export interface IColumn {
   id: string;
   name: string;
   taskIds: string[];
-  createdAt: string;
-  updatedAt: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface ITask {
@@ -15,17 +15,17 @@ export interface ITask {
   createdBy: mongoose.Types.ObjectId;
   assignedTo?: mongoose.Types.ObjectId;
   priority: "low" | "medium" | "high";
-  dueDate: string;
-  createdAt: string;
-  updatedAt: string;
+  dueDate: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface IBoardMember {
   userId: mongoose.Types.ObjectId;
   role: "owner" | "editor" | "viewer";
   invitedBy: mongoose.Types.ObjectId;
-  invitedAt: string;
-  joinedAt?: string;
+  invitedAt: Date;
+  joinedAt?: Date;
   permissions: {
     canView: boolean;
     canEdit: boolean;
@@ -49,32 +49,32 @@ export interface IBoard extends Document {
     requireApproval: boolean;
     defaultRole: "editor" | "viewer";
   };
-  createdAt: string;
-  updatedAt: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const columnSchema = new Schema<IColumn>({
   id: { type: String, required: true },
-  name: { type: String, required: true },
+  name: { type: String, required: true, trim: true },
   taskIds: [{ type: String, required: true }],
-  createdAt: { type: String, required: true },
-  updatedAt: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
 }, { _id: false });
 
 const taskSchema = new Schema<ITask>({
   id: { type: String, required: true },
-  title: { type: String, required: true },
-  description: { type: String, required: true },
+  title: { type: String, required: true, trim: true },
+  description: { type: String, required: true, trim: true },
   createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
-  assignedTo: { type: Schema.Types.ObjectId, ref: "User", required: false },
+  assignedTo: { type: Schema.Types.ObjectId, ref: "User" },
   priority: {
     type: String,
     enum: ["low", "medium", "high"],
     default: "medium",
   },
-  dueDate: { type: String, required: true },
-  createdAt: { type: String, required: true },
-  updatedAt: { type: String, required: true },
+  dueDate: { type: Date, required: true },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
 }, { _id: false });
 
 const boardMemberSchema = new Schema<IBoardMember>({
@@ -85,8 +85,8 @@ const boardMemberSchema = new Schema<IBoardMember>({
     default: "viewer"
   },
   invitedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
-  invitedAt: { type: String, required: true },
-  joinedAt: { type: String },
+  invitedAt: { type: Date, default: Date.now },
+  joinedAt: { type: Date },
   permissions: {
     canView: { type: Boolean, default: true },
     canEdit: { type: Boolean, default: false },
@@ -101,19 +101,27 @@ const boardSchema = new Schema<IBoard>({
   name: { 
     type: String, 
     required: true,
+    trim: true,
     validate: {
-      validator: function(v: string) {
-        return Boolean(v && v.trim().length > 0);
-      },
+      validator: (v: string) => Boolean(v && v.trim().length > 0),
       message: 'Board name cannot be empty'
     }
   },
-  description: String,
+  description: { type: String, trim: true },
   columns: [columnSchema],
   tasks: { type: Map, of: taskSchema, default: {} },
   createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
   isPublic: { type: Boolean, default: false },
-  members: [boardMemberSchema],
+  members: {
+    type: [boardMemberSchema],
+    validate: {
+      validator: function(members: IBoardMember[]) {
+        const ids = members.map(m => m.userId.toString());
+        return ids.length === new Set(ids).size;
+      },
+      message: 'Duplicate members are not allowed'
+    }
+  },
   settings: {
     allowGuestAccess: { type: Boolean, default: false },
     requireApproval: { type: Boolean, default: false },
@@ -122,12 +130,26 @@ const boardSchema = new Schema<IBoard>({
       enum: ["editor", "viewer"],
       default: "viewer"
     }
-  },
-  createdAt: { type: String, required: true },
-  updatedAt: { type: String, required: true },
-});
+  }
+}, { timestamps: true });
 
 // Index for efficient queries
 boardSchema.index({ "members.userId": 1 });
+
+// Ensure tasks Map is serialized as a plain object
+boardSchema.set('toJSON', {
+  transform: (doc, ret) => {
+    if (!ret.tasks) {
+      ret.tasks = {};
+    } else if (ret.tasks instanceof Map) {
+      ret.tasks = Object.fromEntries(ret.tasks);
+    } else if (typeof ret.tasks === 'object' && !Array.isArray(ret.tasks)) {
+      // Already a plain object
+    } else {
+      ret.tasks = {};
+    }
+    return ret;
+  }
+});
 
 export default mongoose.model<IBoard>("Board", boardSchema);

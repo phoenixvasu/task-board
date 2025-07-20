@@ -1,22 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { 
-  Trello, 
-  Plus, 
-  Search, 
-  LogOut, 
-  User,
-  Moon,
-  Sun
-} from 'lucide-react';
-import { useAuthStore } from '../../store/useAuthStore';
-import { useBoardStore } from '../../store/useBoardStore';
-import { useSearchStore } from '../../store/useSearchStore';
-import Avatar from '../ui/Avatar';
-import Button from '../ui/Button';
-import Modal from '../ui/Modal';
-import toast from 'react-hot-toast';
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { Trello, Plus, Search, LogOut, User, Moon, Sun } from "lucide-react";
+import { useAuthStore } from "../../store/useAuthStore";
+import { useBoardStore } from "../../store/useBoardStore";
+import { useSearchStore } from "../../store/useSearchStore";
+import Avatar from "../ui/Avatar";
+import Button from "../ui/Button";
+import Modal from "../ui/Modal";
+import toast from "react-hot-toast";
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
@@ -24,45 +16,48 @@ const Header: React.FC = () => {
   const { createBoard } = useBoardStore();
   const { searchTerm, setSearchTerm } = useSearchStore();
   const getInitialDarkMode = () => {
-    if (typeof window === 'undefined') return false;
-    const stored = localStorage.getItem('theme');
-    if (stored) return stored === 'dark';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (typeof window === "undefined") return false;
+    const stored = localStorage.getItem("theme");
+    if (stored) return stored === "dark";
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
   };
   const [isDarkMode, setIsDarkMode] = useState(getInitialDarkMode);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [newBoardName, setNewBoardName] = useState('');
-  const [newBoardDescription, setNewBoardDescription] = useState('');
+  const [newBoardName, setNewBoardName] = useState("");
+  const [newBoardDescription, setNewBoardDescription] = useState("");
 
   useEffect(() => {
     if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
     } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
     }
   }, [isDarkMode]);
 
   const handleCreateBoard = () => {
     if (!newBoardName.trim()) {
-      toast.error('Please enter a board name');
+      toast.error("Please enter a board name");
       return;
     }
 
-    const boardId = createBoard(newBoardName.trim(), newBoardDescription.trim());
-    setNewBoardName('');
-    setNewBoardDescription('');
+    const boardId = createBoard(
+      newBoardName.trim(),
+      newBoardDescription.trim()
+    );
+    setNewBoardName("");
+    setNewBoardDescription("");
     setShowCreateModal(false);
     navigate(`/board/${boardId}`);
-    toast.success('Board created successfully!');
+    toast.success("Board created successfully!");
   };
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
-    toast.success('Logged out successfully');
+    navigate("/login");
+    toast.success("Logged out successfully");
   };
 
   const toggleDarkMode = () => {
@@ -71,7 +66,7 @@ const Header: React.FC = () => {
 
   const handleProfile = () => {
     setShowUserMenu(false);
-    navigate('/profile');
+    navigate("/profile");
   };
 
   if (!user) return null;
@@ -81,7 +76,10 @@ const Header: React.FC = () => {
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 text-primary hover:text-primary-dark transition-colors">
+          <Link
+            to="/"
+            className="flex items-center gap-2 text-primary hover:text-primary-dark transition-colors"
+          >
             <Trello size={24} />
             <span className="text-xl font-bold">TaskBoard</span>
           </Link>
@@ -89,12 +87,15 @@ const Header: React.FC = () => {
           {/* Search */}
           <div className="flex-1 max-w-md mx-8">
             <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <Search
+                size={16}
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+              />
               <input
                 type="text"
                 placeholder="Search boards and tasks..."
                 value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
               />
             </div>
@@ -123,8 +124,19 @@ const Header: React.FC = () => {
                 onClick={() => setShowUserMenu(!showUserMenu)}
                 className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-md transition-colors"
               >
-                <Avatar user={user} size="sm" />
-                <span className="text-sm font-medium text-gray-700">{user.name}</span>
+                <img
+                  src={
+                    user.avatar ||
+                    `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(
+                      user.name
+                    )}`
+                  }
+                  alt={user.name}
+                  className="w-8 h-8 rounded-full border object-cover"
+                />
+                <span className="text-sm font-medium text-gray-700">
+                  {user.name}
+                </span>
               </button>
 
               {showUserMenu && (
@@ -135,7 +147,10 @@ const Header: React.FC = () => {
                   className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50"
                 >
                   <div className="py-1">
-                    <button className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-800" onClick={handleProfile}>
+                    <button
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-800"
+                      onClick={handleProfile}
+                    >
                       <User size={16} />
                       Profile
                     </button>
@@ -176,7 +191,7 @@ const Header: React.FC = () => {
               autoFocus
             />
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Description
@@ -191,16 +206,10 @@ const Header: React.FC = () => {
           </div>
 
           <div className="flex justify-end gap-3 pt-4">
-            <Button
-              variant="outline"
-              onClick={() => setShowCreateModal(false)}
-            >
+            <Button variant="outline" onClick={() => setShowCreateModal(false)}>
               Cancel
             </Button>
-            <Button
-              variant="primary"
-              onClick={handleCreateBoard}
-            >
+            <Button variant="primary" onClick={handleCreateBoard}>
               Create Board
             </Button>
           </div>
@@ -210,4 +219,4 @@ const Header: React.FC = () => {
   );
 };
 
-export default Header; 
+export default Header;

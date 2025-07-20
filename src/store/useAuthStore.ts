@@ -20,7 +20,7 @@ export const useAuthStore = create<AuthStore>()(
 
       login: async (email, password) => {
         try {
-          const res = await api.post('/auth/login', { email, password });
+          const res = await api.post('/api/auth/login', { email, password });
           if (res.token && res.user) {
             set({
               user: res.user,
@@ -39,7 +39,7 @@ export const useAuthStore = create<AuthStore>()(
 
       register: async (name, email, password, avatar) => {
         try {
-          const res = await api.post('/auth/register', { name, email, password, avatar });
+          const res = await api.post('/api/auth/register', { name, email, password, avatar });
           if (res.user) {
             // Auto-login after register
             const loginRes = await get().login(email, password);
@@ -62,10 +62,17 @@ export const useAuthStore = create<AuthStore>()(
         localStorage.removeItem('jwt');
       },
 
-      updateUser: (updates: Partial<User>) => {
-        set((state) => ({
-          user: state.user ? { ...state.user, ...updates } : null,
-        }));
+      updateUser: async (updates: Partial<User>) => {
+        const state = get();
+        if (!state.user) return;
+        try {
+          const token = state.token || localStorage.getItem('jwt');
+          const res = await api.put(`/api/users/${state.user.id}`, updates, token || undefined);
+          set({ user: { ...state.user, ...res } });
+        } catch (err) {
+          // Optionally handle error
+          throw err;
+        }
       },
     }),
     {

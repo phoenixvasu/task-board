@@ -1,8 +1,16 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express';
 import jwt from 'jsonwebtoken';
-import mongoose from 'mongoose';
 
-const auth: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
+// Optionally extend Express.Request for type safety
+declare global {
+  namespace Express {
+    interface Request {
+      user?: { id: string };
+    }
+  }
+}
+
+const auth = (req: Request, res: Response, next: NextFunction): void => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     res.status(401).json({ message: 'No token provided' });
@@ -11,22 +19,13 @@ const auth: RequestHandler = (req: Request, res: Response, next: NextFunction) =
   const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { id: string };
-    
-    // Convert the ID to ObjectId if it's valid, otherwise use as string
-    let userId: string;
-    try {
-      if (mongoose.Types.ObjectId.isValid(decoded.id)) {
-        userId = new mongoose.Types.ObjectId(decoded.id).toString();
-      } else {
-        userId = decoded.id;
-      }
-    } catch (error) {
-      userId = decoded.id;
-    }
-    
-    (req as any).user = { id: userId };
+    req.user = { id: decoded.id };
     next();
-  } catch (err) {
+  } catch (err: any) {
+    if (err.name === 'TokenExpiredError') {
+      res.status(401).json({ message: 'Token expired' });
+      return;
+    }
     res.status(401).json({ message: 'Invalid token' });
     return;
   }

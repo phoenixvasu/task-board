@@ -24,37 +24,13 @@ export class SharingService {
   static getPermissionsForRole(role: string): UserPermissions {
     switch (role) {
       case 'owner':
-        return {
-          canView: true,
-          canEdit: true,
-          canDelete: true,
-          canInvite: true,
-          canManageMembers: true
-        };
+        return { canView: true, canEdit: true, canDelete: true, canInvite: true, canManageMembers: true };
       case 'editor':
-        return {
-          canView: true,
-          canEdit: true,
-          canDelete: false,
-          canInvite: false,
-          canManageMembers: false
-        };
+        return { canView: true, canEdit: true, canDelete: false, canInvite: false, canManageMembers: false };
       case 'viewer':
-        return {
-          canView: true,
-          canEdit: false,
-          canDelete: false,
-          canInvite: false,
-          canManageMembers: false
-        };
+        return { canView: true, canEdit: false, canDelete: false, canInvite: false, canManageMembers: false };
       default:
-        return {
-          canView: false,
-          canEdit: false,
-          canDelete: false,
-          canInvite: false,
-          canManageMembers: false
-        };
+        return { canView: false, canEdit: false, canDelete: false, canInvite: false, canManageMembers: false };
     }
   }
 
@@ -64,147 +40,134 @@ export class SharingService {
     return access.permissions[action];
   }
 
-  // Add member to board
-  static async addMember(boardId: string, userId: string, role: "editor" | "viewer", invitedBy: string): Promise<boolean> {
+  // Add member to board and emit real-time event
+  static async addMember(
+    boardId: string,
+    userId: string,
+    role: "editor" | "viewer",
+    invitedBy: string,
+  ): Promise<boolean> {
+    const session = await mongoose.startSession();
+    session.startTransaction();
     try {
-      const board = await Board.findOne({ id: boardId });
-      if (!board) return false;
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
+        throw new Error('Invalid userId');
+      }
+      const userObjId = new mongoose.Types.ObjectId(userId);
+      const invitedByObjId = new mongoose.Types.ObjectId(invitedBy);
+      const board = await Board.findOne({ id: boardId }).session(session);
+      if (!board) throw new Error('Board not found');
 
-      // Check if inviter has permission to invite
+      // Permission check
       const canInvite = await this.canPerformAction(boardId, invitedBy, 'canInvite');
-      if (!canInvite) {
-        console.error('User does not have permission to invite members:', invitedBy);
-        return false;
-      }
+      if (!canInvite) throw new Error('No permission to invite');
 
-      // Check if user is already a member
-      const existingMember = board.members.find(m => {
-        const memberUserId = typeof m.userId === 'object' && m.userId._id 
-          ? m.userId._id.toString() 
-          : m.userId.toString();
-        return memberUserId === userId;
-      });
+      // Prevent duplicate
+      if (board.members.some(m => m.userId.toString() === userObjId.toString())) throw new Error('Already a member');
 
-      if (existingMember) {
-        console.error('User is already a member of this board');
-        return false;
-      }
-
-      // Validate role - only editor and viewer are allowed for new members
-      if (!['editor', 'viewer'].includes(role)) {
-        console.error('Invalid role for new member:', role);
-        return false;
-      }
+      if (!['editor', 'viewer'].includes(role)) throw new Error('Invalid role');
 
       const newMember: IBoardMember = {
-        userId: new mongoose.Types.ObjectId(userId),
+        userId: userObjId,
         role,
-        invitedBy: new mongoose.Types.ObjectId(invitedBy),
-        invitedAt: new Date().toISOString(),
-        joinedAt: new Date().toISOString(),
+        invitedBy: invitedByObjId,
+        invitedAt: new Date(),
+        joinedAt: new Date(),
         permissions: this.getPermissionsForRole(role)
       };
 
       board.members.push(newMember);
-      await board.save();
+
+      await board.save({ session }).then(
+        (saved) => {},
+        (err) => console.error('[addMember] Error on save:', err)
+      );
+      await session.commitTransaction();
+
+      // Log the board after save for debugging
+      const freshBoard = await Board.findOne({ id: boardId });
       return true;
     } catch (error) {
-      console.error('Error adding member to board:', error);
+      await session.abortTransaction();
+      if (error instanceof Error) {
+        console.error('Error adding member:', error.message);
+      } else {
+        console.error('Error adding member:', error);
+      }
       return false;
+    } finally {
+      session.endSession();
     }
   }
 
-  // Remove member from board
-  static async removeMember(boardId: string, userId: string, removedBy: string): Promise<boolean> {
+  // Remove member from board and emit real-time event
+  static async removeMember(
+    boardId: string,
+    userId: string,
+    removedBy: string,
+  ): Promise<boolean> {
+    const session = await mongoose.startSession();
+    session.startTransaction();
     try {
-      const board = await Board.findOne({ id: boardId });
-      if (!board) return false;
+      const board = await Board.findOne({ id: boardId }).session(session);
+      if (!board) throw new Error('Board not found');
 
-      // Check if remover has permission
       const canManageMembers = await this.canPerformAction(boardId, removedBy, 'canManageMembers');
-      if (!canManageMembers) {
-        console.error('User does not have permission to remove members:', removedBy);
-        return false;
-      }
+      if (!canManageMembers) throw new Error('No permission to remove');
 
-      // Find member to remove
-      const memberIndex = board.members.findIndex(m => {
-        const memberUserId = typeof m.userId === 'object' && m.userId._id 
-          ? m.userId._id.toString() 
-          : m.userId.toString();
-        return memberUserId === userId;
-      });
-
-      if (memberIndex === -1) {
-        console.error('Member not found:', userId);
-        return false;
-      }
-
-      // Don't allow removing the owner
-      if (board.members[memberIndex].role === 'owner') {
-        console.error('Cannot remove owner from board');
-        return false;
-      }
-
-      // Don't allow removing yourself
-      if (board.members[memberIndex].userId.toString() === removedBy) {
-        console.error('Cannot remove yourself from board');
-        return false;
-      }
+      const memberIndex = board.members.findIndex(m => m.userId.toString() === userId);
+      if (memberIndex === -1) throw new Error('Member not found');
+      if (board.members[memberIndex].role === 'owner') throw new Error('Cannot remove owner');
+      if (userId === removedBy) throw new Error('Cannot remove yourself');
 
       board.members.splice(memberIndex, 1);
-      await board.save();
+      await board.save({ session });
+      await session.commitTransaction();
+
       return true;
     } catch (error) {
-      console.error('Error removing member from board:', error);
+      await session.abortTransaction();
+      if (error instanceof Error) {
+        console.error('Error removing member:', error.message);
+      } else {
+        console.error('Error removing member:', error);
+      }
       return false;
+    } finally {
+      session.endSession();
     }
   }
 
-  // Update member role
-  static async updateMemberRole(boardId: string, userId: string, newRole: "editor" | "viewer", updatedBy: string): Promise<boolean> {
+  // Update member role and emit real-time event
+  static async updateMemberRole(
+    boardId: string,
+    userId: string,
+    newRole: "editor" | "viewer",
+    updatedBy: string,
+  ): Promise<boolean> {
     try {
       const board = await Board.findOne({ id: boardId });
-      if (!board) return false;
+      if (!board) throw new Error('Board not found');
 
-      // Check if updater has permission
       const canManageMembers = await this.canPerformAction(boardId, updatedBy, 'canManageMembers');
-      if (!canManageMembers) {
-        console.error('User does not have permission to update member roles:', updatedBy);
-        return false;
-      }
+      if (!canManageMembers) throw new Error('No permission to update roles');
 
-      // Find member to update
-      const member = board.members.find(m => {
-        const memberUserId = typeof m.userId === 'object' && m.userId._id 
-          ? m.userId._id.toString() 
-          : m.userId.toString();
-        return memberUserId === userId;
-      });
-
-      if (!member) {
-        console.error('Member not found:', userId);
-        return false;
-      }
-
-      // Don't allow changing owner role
-      if (member.role === 'owner') {
-        console.error('Cannot change owner role');
-        return false;
-      }
-
-      // Validate new role - only editor and viewer are allowed
-      if (!['editor', 'viewer'].includes(newRole)) {
-        console.error('Invalid role for member update:', newRole);
-        return false;
-      }
+      const member = board.members.find(m => m.userId.toString() === userId);
+      if (!member) throw new Error('Member not found');
+      if (member.role === 'owner') throw new Error('Cannot change owner role');
+      if (!['editor', 'viewer'].includes(newRole)) throw new Error('Invalid new role');
 
       member.role = newRole;
       member.permissions = this.getPermissionsForRole(newRole);
       await board.save();
+
       return true;
     } catch (error) {
-      console.error('Error updating member role:', error);
+      if (error instanceof Error) {
+        console.error('Error updating member role:', error.message);
+      } else {
+        console.error('Error updating member role:', error);
+      }
       return false;
     }
   }
@@ -212,101 +175,53 @@ export class SharingService {
   // Check board access for a user
   static async checkBoardAccess(boardId: string, userId: string): Promise<BoardAccess> {
     try {
-      const board = await Board.findOne({ id: boardId });
+      const board = await Board.findOne({ id: boardId }).lean();
       if (!board) {
-        return {
-          hasAccess: false,
-          permissions: {
-            canView: false,
-            canEdit: false,
-            canDelete: false,
-            canInvite: false,
-            canManageMembers: false
-          }
-        };
+        return { hasAccess: false, permissions: this.getPermissionsForRole('none') };
       }
-
-      // Check if user is the owner
       if (board.createdBy.toString() === userId) {
-        return {
-          hasAccess: true,
-          role: 'owner',
-          permissions: this.getPermissionsForRole('owner')
-        };
+        return { hasAccess: true, role: 'owner', permissions: this.getPermissionsForRole('owner') };
       }
-
-      // Check if user is a member
-      const member = board.members.find(m => {
-        const memberUserId = typeof m.userId === 'object' && m.userId._id 
-          ? m.userId._id.toString() 
-          : m.userId.toString();
-        return memberUserId === userId;
-      });
-
+      const member = board.members.find(m => m.userId.toString() === userId);
       if (member) {
-        return {
-          hasAccess: true,
-          role: member.role,
-          permissions: member.permissions
-        };
+        return { hasAccess: true, role: member.role, permissions: member.permissions };
       }
-
-      // Check if board is public
       if (board.isPublic) {
-        return {
-          hasAccess: true,
-          role: 'viewer',
-          permissions: this.getPermissionsForRole('viewer')
-        };
+        return { hasAccess: true, role: 'viewer', permissions: this.getPermissionsForRole('viewer') };
       }
-
-      return {
-        hasAccess: false,
-        permissions: {
-          canView: false,
-          canEdit: false,
-          canDelete: false,
-          canInvite: false,
-          canManageMembers: false
-        }
-      };
+      return { hasAccess: false, permissions: this.getPermissionsForRole('none') };
     } catch (error) {
-      console.error('Error checking board access:', error);
-      return {
-        hasAccess: false,
-        permissions: {
-          canView: false,
-          canEdit: false,
-          canDelete: false,
-          canInvite: false,
-          canManageMembers: false
-        }
-      };
+      if (error instanceof Error) {
+        console.error('Error checking board access:', error.message);
+      } else {
+        console.error('Error checking board access:', error);
+      }
+      return { hasAccess: false, permissions: this.getPermissionsForRole('none') };
     }
   }
 
-  // Get board members
+  // Get board members (lean, only needed fields)
   static async getBoardMembers(boardId: string): Promise<any[]> {
     try {
-      const board = await Board.findOne({ id: boardId }).populate('members.userId', 'name email');
+      const board = await Board.findOne({ id: boardId })
+        .populate('members.userId', 'name email')
+        .lean();
       if (!board) return [];
-
-      return board.members.map(member => ({
-        userId: typeof member.userId === 'object' && member.userId._id 
-          ? member.userId._id.toString() 
-          : member.userId.toString(),
-        username: typeof member.userId === 'object' && 'name' in member.userId && member.userId.name
-          ? member.userId.name 
-          : 'Unknown User',
-        email: typeof member.userId === 'object' && 'email' in member.userId && member.userId.email
-          ? member.userId.email 
-          : 'unknown@example.com',
+      const members = board.members.map(member => ({
+        userId: member.userId._id?.toString() || member.userId.toString(),
+        username: typeof member.userId === 'object' && 'name' in member.userId ? (member.userId as any).name : 'Unknown User',
+        email: typeof member.userId === 'object' && 'email' in member.userId ? member.userId.email : 'unknown@example.com',
         role: member.role,
         invitedAt: member.invitedAt,
         joinedAt: member.joinedAt
       }));
+      return members;
     } catch (error) {
-      console.error('Error getting board members:', error);
+      if (error instanceof Error) {
+        console.error('Error getting board members:', error.message);
+      } else {
+        console.error('Error getting board members:', error);
+      }
       return [];
     }
   }
@@ -314,23 +229,19 @@ export class SharingService {
   // Get boards shared with a user
   static async getSharedBoards(userId: string): Promise<any[]> {
     try {
-      // Only get boards where user is a member but NOT the owner
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
+        console.error('[getSharedBoards] Invalid userId:', userId);
+        return [];
+      }
+      const userObjId = new mongoose.Types.ObjectId(userId);
       const boards = await Board.find({
-        'members.userId': new mongoose.Types.ObjectId(userId),
-        createdBy: { $ne: new mongoose.Types.ObjectId(userId) }
-      });
-
+        'members.userId': userObjId,
+        createdBy: { $ne: userObjId }
+      }).lean();
       return boards.map(board => {
-        const member = board.members.find(m => {
-          const memberUserId = typeof m.userId === 'object' && m.userId._id 
-            ? m.userId._id.toString() 
-            : m.userId.toString();
-          return memberUserId === userId;
-        });
-
+        const member = board.members.find(m => m.userId.toString() === userObjId.toString());
         const role = member ? member.role : 'viewer';
         const permissions = this.getPermissionsForRole(role);
-
         return {
           boardId: board.id,
           name: board.name,
@@ -340,14 +251,18 @@ export class SharingService {
           createdAt: board.createdAt,
           updatedAt: board.updatedAt,
           columns: board.columns,
-          tasks: board.tasks
+          tasks: board.tasks instanceof Map ? Object.fromEntries(board.tasks) : board.tasks
         };
       });
     } catch (error) {
-      console.error('Error getting shared boards:', error);
+      if (error instanceof Error) {
+        console.error('Error getting shared boards:', error.message);
+      } else {
+        console.error('Error getting shared boards:', error);
+      }
       return [];
     }
   }
 }
 
-export default SharingService; 
+export default SharingService;
