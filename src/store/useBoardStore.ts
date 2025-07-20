@@ -2,18 +2,18 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Board, Task, Column, User } from '../types';
 import { api } from '../api';
-import { socket, emitSocketEvent, onSocketEvent, setSocketAuthToken, getSocketId } from '../api/socket';
+import { socket, emitSocketEvent, onSocketEvent, getSocketId } from '../api/socket';
 import {
   SOCKET_EVENTS,
   CreateTaskPayload, TaskCreatedPayload, UpdateTaskPayload, TaskUpdatedPayload, DeleteTaskPayload, TaskDeletedPayload, MoveTaskPayload, TaskMovedPayload, ReorderTasksPayload, TasksReorderedPayload,
   CreateColumnPayload, ColumnCreatedPayload, UpdateColumnPayload, ColumnUpdatedPayload, DeleteColumnPayload, ColumnDeletedPayload, ReorderColumnsPayload, ColumnsReorderedPayload,
-  UpdateBoardPayload, BoardUpdatedPayload, DeleteBoardPayload, BoardDeletedPayload, AckSuccess, AckError, BulkMoveTasksPayload, TasksBulkMovedPayload, BulkUpdateTasksPayload, TasksBulkUpdatedPayload, BulkUpdateColumnsPayload, ColumnsBulkUpdatedPayload, JoinBoardPayload
+  BoardUpdatedPayload, BoardDeletedPayload, AckSuccess, AckError, TasksBulkMovedPayload, TasksBulkUpdatedPayload, ColumnsBulkUpdatedPayload, JoinBoardPayload
 } from '../types/socketEvents';
 import { useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { useCollaborationStore } from './useCollaborationStore';
 import { useAuthStore } from './useAuthStore';
-import { debounce, throttle } from '../utils';
+import { debounce } from '../utils';
 
 function isColumn(col: any): col is Column {
   return (
@@ -215,13 +215,18 @@ export const useBoardStore = create<BoardState>()(
           const prev = state.boards[id] || {};
           // Ensure columns and tasks are always present and correctly typed
           const columns = Array.isArray(res.columns)
-            ? res.columns.map((col: any) => ({
-                id: String(col.id),
-                name: String(col.name),
-                taskIds: Array.isArray(col.taskIds) ? col.taskIds.filter((id: any) => typeof id === 'string') : [],
-                createdAt: typeof col.createdAt === 'string' ? col.createdAt : new Date().toISOString(),
-                updatedAt: typeof col.updatedAt === 'string' ? col.updatedAt : new Date().toISOString(),
-              } as Column))
+            ? res.columns.map((col: any) => {
+                const taskIds: string[] = Array.isArray(col.taskIds)
+                  ? col.taskIds.filter((id: any) => typeof id === 'string')
+                  : [];
+                return {
+                  id: String(col.id),
+                  name: String(col.name),
+                  taskIds,
+                  createdAt: typeof col.createdAt === 'string' ? col.createdAt : new Date().toISOString(),
+                  updatedAt: typeof col.updatedAt === 'string' ? col.updatedAt : new Date().toISOString(),
+                } as Column;
+              }) as Column[]
             : (prev.columns as Column[]) || [];
           const tasks = res.tasks && typeof res.tasks === 'object' && !Array.isArray(res.tasks)
             ? res.tasks
@@ -559,16 +564,46 @@ export const useBoardStore = create<BoardState>()(
       },
       reorderTasks: async (boardId: string, columnId: string, taskIds: string[]) => {
         return new Promise<void>((resolve, reject) => {
-          const prevTaskIds = get().boards[boardId]?.columns.find(col => col.id === columnId)?.taskIds;
+          const state = get();
+          const board = state.boards[boardId];
+          
+          if (!board) {
+            reject(new Error('Board not found'));
+            return;
+          }
+
+          // Store the previous taskIds for rollback
+          const targetColumn = board.columns.find(col => col.id === columnId);
+          if (!targetColumn) {
+            reject(new Error('Column not found'));
+            return;
+          }
+          
+          const prevTaskIds = [...targetColumn.taskIds]; // Create a copy for rollback
+
+          // Optimistic update
           set(state => {
             const board = state.boards[boardId];
             if (!board) return state;
+            
             const columns = board.columns.map(col =>
-              col.id === columnId ? { ...col, taskIds } : col
+              col.id === columnId ? { ...col, taskIds: [...taskIds] } : col
             );
-            return { boards: { ...state.boards, [boardId]: { ...board, columns } } };
+            
+            return { 
+              ...state,
+              boards: { 
+                ...state.boards, 
+                [boardId]: { 
+                  ...board, 
+                  columns 
+                } 
+              } 
+            };
           });
+
           optimisticUpdates.reorderTasks.set(columnId, taskIds);
+          
           emitSocketEvent<ReorderTasksPayload, AckSuccess | AckError>(
             SOCKET_EVENTS.REORDER_TASKS,
             { boardId, columnId, taskIds },
@@ -577,17 +612,29 @@ export const useBoardStore = create<BoardState>()(
                 optimisticUpdates.reorderTasks.delete(columnId);
                 resolve();
               } else {
+                // Rollback on error
                 set(state => {
                   const board = state.boards[boardId];
                   if (!board) return state;
+                  
                   const columns = board.columns.map(col =>
-                    col.id === columnId ? { ...col, taskIds: prevTaskIds } : col
+                    col.id === columnId ? { ...col, taskIds: [...prevTaskIds] } : col
                   );
-                  return { boards: { ...state.boards, [boardId]: { ...board, columns } } };
+                  
+                  return { 
+                    ...state,
+          boards: {
+            ...state.boards,
+            [boardId]: {
+                        ...board, 
+                        columns 
+                      } 
+                    } 
+                  };
                 });
+                
                 optimisticUpdates.reorderTasks.delete(columnId);
-                toast.error(ack.error);
-                reject(new Error(ack.error));
+                reject(new Error(ack.error || 'Failed to reorder tasks'));
               }
             }
           );
@@ -685,7 +732,6 @@ export const useBoardStore = create<BoardState>()(
       if (!board) return state;
       const optimistic = optimisticUpdates.updateTask.get(payload.taskId);
       if (optimistic) {
-        const serverTask = { ...board.tasks[payload.taskId], ...payload.updates };
         const isEqual = JSON.stringify(optimistic) === JSON.stringify(payload.updates);
         optimisticUpdates.updateTask.delete(payload.taskId);
         if (!isEqual) {
@@ -878,11 +924,14 @@ export const useBoardStore = create<BoardState>()(
   });
   onSocketEvent(SOCKET_EVENTS.MEMBER_REMOVED, (payload) => {
     const userId = useAuthStore.getState().user?.id;
-    if (payload.userId === userId) {
-      set(state => {
-        const { [payload.boardId]: _, ...boards } = state.boards;
-        return { boards };
-      });
+    if (typeof payload === 'object' && payload !== null && 'userId' in payload && 'boardId' in payload) {
+      const p = payload as { userId: string; boardId: string };
+      if (p.userId === userId) {
+        set(state => {
+          const { [p.boardId]: _, ...boards } = state.boards;
+          return { boards };
+        });
+      }
     }
   });
 })();

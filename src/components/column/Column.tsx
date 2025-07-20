@@ -92,7 +92,7 @@ const Column: React.FC<ColumnProps> = ({ column, boardId, children }) => {
       createdBy: currentUserId,
       assignedTo: finalAssignee,
       priority: newTaskPriority,
-      dueDate: dueDateValue,
+      dueDate: dueDateValue || undefined,
     });
     setNewTaskTitle("");
     setNewTaskDescription("");

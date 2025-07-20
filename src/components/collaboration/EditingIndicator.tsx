@@ -1,10 +1,5 @@
 import React from "react";
 import { useCollaborationStore } from "../../store/useCollaborationStore";
-import { Edit3, User } from "lucide-react";
-
-interface EditingIndicatorProps {
-  taskId: string;
-}
 
 const EditingIndicator: React.FC<{ taskId: string }> = ({ taskId }) => {
   const editingUsers = useCollaborationStore((state) => state.editingUsers);

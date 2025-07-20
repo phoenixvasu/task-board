@@ -1,19 +1,10 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import {
-  Plus,
-  Calendar,
-  Users,
-  Clock,
-  Edit,
-  Trash2,
-  Share2,
-} from "lucide-react";
+import { Plus, Calendar, Users, Clock, Edit, Trash2 } from "lucide-react";
 import { useBoardStore } from "../store/useBoardStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useSearchStore } from "../store/useSearchStore";
-import { useSharingStore } from "../store/useSharingStore";
 import Button from "../components/ui/Button";
 import Modal from "../components/ui/Modal";
 import { formatDate } from "../utils";
@@ -22,11 +13,9 @@ import { onSocketEvent, emitSocketEvent } from "../api/socket";
 import { SOCKET_EVENTS } from "../types/socketEvents";
 
 const BoardList: React.FC = () => {
-  const { boards, fetchBoards, createBoard, deleteBoard, updateBoard } =
-    useBoardStore();
+  const { boards, createBoard, deleteBoard } = useBoardStore();
   const { user } = useAuthStore();
   const { searchTerm, setPage } = useSearchStore();
-  const { getSharedBoards } = useSharingStore();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingBoard, setEditingBoard] = useState<any>(null);
@@ -250,7 +239,6 @@ const BoardList: React.FC = () => {
     setIsLoading(true);
     if (editingBoard) {
       // Optimistic UI update
-      const prevBoard = { ...editingBoard };
       const updates = {
         name: editBoardName.trim(),
         description: editBoardDescription.trim(),
@@ -268,19 +256,8 @@ const BoardList: React.FC = () => {
       emitSocketEvent(
         SOCKET_EVENTS.UPDATE_BOARD,
         { boardId: editingBoard.id, updates },
-        (ack) => {
-          if (!ack.success) {
-            // Rollback on error
-            useBoardStore.setState((state) => ({
-              boards: {
-                ...state.boards,
-                [editingBoard.id]: prevBoard,
-              },
-            }));
-            toast.error(ack.error || "Failed to update board");
-          } else {
-            toast.success("Board updated successfully!");
-          }
+        () => {
+          toast.success("Board updated successfully!");
         }
       );
       setShowEditModal(false);
@@ -458,7 +435,7 @@ const BoardList: React.FC = () => {
                   {Array.isArray(filteredBoards) &&
                     filteredBoards.map((board, idx) => {
                       // Ensure we have the correct board ID
-                      const boardId = board.id || board.boardId;
+                      const boardId = board.id;
                       if (!boardId) {
                         console.error("Board missing ID:", board);
                         return null;
@@ -492,10 +469,10 @@ const BoardList: React.FC = () => {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span
                               className={`px-2 py-1 text-xs font-medium rounded ${getRoleColor(
-                                board.role || "owner"
+                                (board as any).userRole || "owner"
                               )}`}
                             >
-                              {board.role || "owner"}
+                              {(board as any).userRole || "owner"}
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">

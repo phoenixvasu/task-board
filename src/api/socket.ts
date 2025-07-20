@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import { SOCKET_EVENTS, SocketEventName } from '../types/socketEvents';
+import { SocketEventName } from '../types/socketEvents';
 import { useCollaborationStore } from '../store/useCollaborationStore';
 
 const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '');

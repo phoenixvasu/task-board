@@ -5,7 +5,6 @@ import { Trello, Plus, Search, LogOut, User, Moon, Sun } from "lucide-react";
 import { useAuthStore } from "../../store/useAuthStore";
 import { useBoardStore } from "../../store/useBoardStore";
 import { useSearchStore } from "../../store/useSearchStore";
-import Avatar from "../ui/Avatar";
 import Button from "../ui/Button";
 import Modal from "../ui/Modal";
 import toast from "react-hot-toast";

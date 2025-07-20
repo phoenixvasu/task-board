@@ -1,7 +1,5 @@
-import React, { useState, useRef, useEffect } from "react";
+import React from "react";
 import { useCollaborationStore } from "../../store/useCollaborationStore";
-import Avatar from "../ui/Avatar";
-import { Users, ChevronDown } from "lucide-react";
 
 const ActiveUsers: React.FC = () => {
   const activeUsers = useCollaborationStore((state) => state.activeUsers);

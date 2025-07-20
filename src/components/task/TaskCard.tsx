@@ -181,7 +181,10 @@ const TaskCard: React.FC<TaskCardProps> = ({ taskId, boardId }) => {
               setEditTask(
                 editTask ? { ...editTask, title: e.target.value } : null
               );
-              emitTyping(boardId, taskId, useAuthStore.getState().user?.id);
+              const userId = useAuthStore.getState().user?.id;
+              if (userId) {
+                emitTyping(boardId, taskId, userId);
+              }
             }}
             className="input w-full"
             placeholder="Task title"
@@ -193,7 +196,10 @@ const TaskCard: React.FC<TaskCardProps> = ({ taskId, boardId }) => {
               setEditTask(
                 editTask ? { ...editTask, description: e.target.value } : null
               );
-              emitTyping(boardId, taskId, useAuthStore.getState().user?.id);
+              const userId = useAuthStore.getState().user?.id;
+              if (userId) {
+                emitTyping(boardId, taskId, userId);
+              }
             }}
             className="textarea w-full"
             placeholder="Task description (supports markdown)"
@@ -201,18 +207,22 @@ const TaskCard: React.FC<TaskCardProps> = ({ taskId, boardId }) => {
           />
           <div className="flex gap-2">
             <Dropdown
-              options={["low", "medium", "high"].map((p) => ({
-                value: p,
-                label: p.charAt(0).toUpperCase() + p.slice(1),
-              }))}
+              options={[
+                { value: "Low", label: "Low" },
+                { value: "Medium", label: "Medium" },
+                { value: "High", label: "High" },
+              ]}
               value={editTask.priority}
-              onChange={(val) => {
+              onChange={(val: string) => {
                 setEditTask(
                   editTask
                     ? { ...editTask, priority: val as typeof editTask.priority }
                     : null
                 );
-                emitTyping(boardId, taskId, useAuthStore.getState().user?.id);
+                const userId = useAuthStore.getState().user?.id;
+                if (userId) {
+                  emitTyping(boardId, taskId, userId);
+                }
               }}
               placeholder="Priority"
             />
@@ -222,11 +232,14 @@ const TaskCard: React.FC<TaskCardProps> = ({ taskId, boardId }) => {
                 ...users.map((u) => ({ value: u.id, label: u.name })),
               ]}
               value={editTask.assignedTo || ""}
-              onChange={(val) => {
+              onChange={(val: string) => {
                 setEditTask(
                   editTask ? { ...editTask, assignedTo: val || null } : null
                 );
-                emitTyping(boardId, taskId, useAuthStore.getState().user?.id);
+                const userId = useAuthStore.getState().user?.id;
+                if (userId) {
+                  emitTyping(boardId, taskId, userId);
+                }
               }}
               placeholder="Assign to"
             />
@@ -237,7 +250,10 @@ const TaskCard: React.FC<TaskCardProps> = ({ taskId, boardId }) => {
                 setEditTask(
                   editTask ? { ...editTask, dueDate: e.target.value } : null
                 );
-                emitTyping(boardId, taskId, useAuthStore.getState().user?.id);
+                const userId = useAuthStore.getState().user?.id;
+                if (userId) {
+                  emitTyping(boardId, taskId, userId);
+                }
               }}
               className="input"
             />

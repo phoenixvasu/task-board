@@ -1,7 +1,6 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useBoardStore } from "../store/useBoardStore";
-import { useCollaborationStore } from "../store/useCollaborationStore";
 import { useSharingStore } from "../store/useSharingStore";
 import { useBoardSocket } from "../store/useBoardStore";
 import { useAuthStore } from "../store/useAuthStore";
@@ -49,7 +48,7 @@ const BoardDetail: React.FC = () => {
   // @ts-ignore: useBoardSocket is injected in useBoardStore
   useBoardSocket(currentBoardId, user?.id);
 
-  const activityFeed = useActivityFeed(currentBoardId);
+  const activityFeed = useActivityFeed(currentBoardId || "");
 
   useEffect(() => {
     setPage("tasks");

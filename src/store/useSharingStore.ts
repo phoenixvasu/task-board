@@ -1,10 +1,9 @@
 import { create } from 'zustand';
 import { api } from '../api';
-import { socket, emitSocketEvent, onSocketEvent, getSocketId } from '../api/socket';
+import { emitSocketEvent, onSocketEvent, getSocketId } from '../api/socket';
 import { SOCKET_EVENTS, AddMemberPayload, MemberAddedPayload, RemoveMemberPayload, MemberRemovedPayload, ChangeRolePayload, RoleChangedPayload, AckSuccess, AckError, BulkUpdateMembersPayload, MembersBulkUpdatedPayload } from '../types/socketEvents';
 import { toast } from 'react-toastify';
 import { useAuthStore } from './useAuthStore';
-import { useNavigate } from 'react-router-dom';
 import { useBoardStore } from './useBoardStore';
 
 export interface BoardMember {
@@ -38,9 +37,9 @@ interface SharingState {
   
   // Actions
   fetchMembers: (boardId: string) => Promise<void>;
-  addMember: (boardId: string, userId: string, role: 'editor' | 'viewer') => Promise<boolean>;
+  addMember: (boardId: string, userId: string, role: 'owner' | 'editor' | 'viewer') => Promise<boolean>;
   removeMember: (boardId: string, userId: string) => Promise<boolean>;
-  updateMemberRole: (boardId: string, userId: string, role: 'editor' | 'viewer') => Promise<boolean>;
+  updateMemberRole: (boardId: string, userId: string, role: 'owner' | 'editor' | 'viewer') => Promise<boolean>;
   
   checkBoardAccess: (boardId: string) => Promise<BoardAccess>;
   
@@ -56,7 +55,7 @@ const optimisticMemberAdds = new Map<string, any>();
 const optimisticMemberRemoves = new Map<string, any>();
 const optimisticRoleChanges = new Map<string, any>();
 
-function registerSharingSocketListeners(set, get) {
+function registerSharingSocketListeners(set: (state: any) => void) {
   onSocketEvent(SOCKET_EVENTS.MEMBER_ADDED, (payload: MemberAddedPayload) => {
     if (payload.sourceClientId && payload.sourceClientId === getSocketId()) return;
     const optimistic = optimisticMemberAdds.get(payload.member.userId);
@@ -68,10 +67,10 @@ function registerSharingSocketListeners(set, get) {
       }
     }
     // Replace any member with the same userId
-    set(state => ({
+    set((state: SharingState) => ({
       members: [
-        ...state.members.filter(m => m.userId !== payload.member.userId),
-        payload.member
+      ...state.members.filter((m: BoardMember) => m.userId !== payload.member.userId),
+      payload.member as BoardMember
       ]
     }));
   });
@@ -82,9 +81,9 @@ function registerSharingSocketListeners(set, get) {
       optimisticMemberRemoves.delete(payload.userId);
       toast.info('Member removal overwritten by server.');
     }
-    set(state => ({ members: state.members.filter(m => m.userId !== payload.userId) }));
+    set((state: SharingState) => ({ members: state.members.filter((m: BoardMember) => m.userId !== payload.userId) }));
   });
-  onSocketEvent(SOCKET_EVENTS.ROLE_CHANGED, (payload: RoleChangedPayload) => {
+  onSocketEvent(SOCKET_EVENTS.ROLE_CHANGED, (payload: RoleChangedPayload & { role: BoardMember['role'] }) => {
     if (payload.sourceClientId && payload.sourceClientId === getSocketId()) return;
     const optimistic = optimisticRoleChanges.get(payload.userId);
     if (optimistic) {
@@ -94,38 +93,45 @@ function registerSharingSocketListeners(set, get) {
         toast.info('Role change overwritten by server.');
       }
     }
-    set(state => ({ members: state.members.map(m => m.userId === payload.userId ? { ...m, role: payload.role } : m) }));
+    set((state: SharingState) => ({
+      members: state.members.map((m: BoardMember) =>
+      m.userId === payload.userId ? { ...m, role: payload.role as BoardMember['role'] } : m
+      ),
+    }));
     // --- If the affected user is the current user, update boardAccess.role and permissions ---
     const userId = useAuthStore.getState().user?.id;
     if (payload.userId === userId) {
       // Fetch new permissions for the new role
-      const permissions = payload.role === 'owner'
+      const role = payload.role as BoardMember['role'];
+      const permissions = role === 'owner'
         ? { canView: true, canEdit: true, canDelete: true, canInvite: true, canManageMembers: true }
-        : payload.role === 'editor'
+        : role === 'editor'
         ? { canView: true, canEdit: true, canDelete: false, canInvite: false, canManageMembers: false }
         : { canView: true, canEdit: false, canDelete: false, canInvite: false, canManageMembers: false };
-      set(state => ({
+      set((state: SharingState) => ({
         boardAccess: {
           ...state.boardAccess,
-          role: payload.role,
+          role,
           permissions,
         },
       }));
-      toast.info(`Your role on this board is now: ${payload.role}`);
+      toast.info(`Your role on this board is now: ${role}`);
     }
   });
   onSocketEvent(SOCKET_EVENTS.PERMISSIONS_UPDATED, (payload) => {
+    // Type assertion for payload
+    const typedPayload = payload as { userId: string; permissions: { canView: boolean } };
     const userId = useAuthStore.getState().user?.id;
-    if (payload.userId === userId) {
+    if (typedPayload.userId === userId) {
       // Update boardAccess
-      set(state => ({
+      set((state: SharingState) => ({
         boardAccess: {
           ...state.boardAccess,
-          permissions: payload.permissions,
-          hasAccess: payload.permissions.canView,
+          permissions: typedPayload.permissions as BoardAccess['permissions'],
+          hasAccess: typedPayload.permissions.canView,
         },
       }));
-      if (!payload.permissions.canView) {
+      if (!typedPayload.permissions.canView) {
         toast.error('Your access to this board has been revoked.');
         // Redirect to board list
         window.location.href = '/';
@@ -141,7 +147,7 @@ function registerSharingSocketListeners(set, get) {
 }
 
 // Move these function declarations outside the store
-const addMember = async (boardId: string, userId: string, role: 'editor' | 'viewer') => {
+const addMember = async (boardId: string, userId: string, role: 'owner' | 'editor' | 'viewer') => {
   return new Promise<boolean>((resolve, reject) => {
     // Fill in as much info as possible from local user list
     const user = useBoardStore.getState().users.find(u => u.id === userId);
@@ -154,9 +160,13 @@ const addMember = async (boardId: string, userId: string, role: 'editor' | 'view
     };
     useSharingStore.setState(state => ({ members: [...state.members, optimisticMember] }));
     optimisticMemberAdds.set(userId, optimisticMember);
+
+    // Only allow 'editor' or 'viewer' roles for AddMemberPayload
+    const allowedRole = role === 'owner' ? 'editor' : role;
+
     emitSocketEvent<AddMemberPayload, AckSuccess | AckError>(
       SOCKET_EVENTS.ADD_MEMBER,
-      { boardId, userId, role },
+      { boardId, userId, role: allowedRole },
       (ack) => {
         if (ack.success) {
           optimisticMemberAdds.delete(userId);
@@ -196,15 +206,17 @@ const removeMember = async (boardId: string, userId: string) => {
     );
   });
 };
-const updateMemberRole = async (boardId: string, userId: string, role: 'editor' | 'viewer') => {
+const updateMemberRole = async (boardId: string, userId: string, role: 'owner' | 'editor' | 'viewer') => {
   return new Promise<boolean>((resolve, reject) => {
     const prevMembers = useSharingStore.getState().members;
     // Optimistic update
     useSharingStore.setState(state => ({ members: state.members.map(m => m.userId === userId ? { ...m, role } : m) }));
     optimisticRoleChanges.set(userId, role);
+    // Only allow 'editor' or 'viewer' roles for ChangeRolePayload
+    const allowedRole = role === 'owner' ? 'editor' : role;
     emitSocketEvent<ChangeRolePayload, AckSuccess | AckError>(
       SOCKET_EVENTS.CHANGE_ROLE,
-      { boardId, userId, role },
+      { boardId, userId, role: allowedRole },
       (ack) => {
         if (ack.success) {
           optimisticRoleChanges.delete(userId);
@@ -248,7 +260,7 @@ const bulkUpdateMembers = async (boardId: string, updates: Array<{ userId: strin
   });
 };
 
-export const useSharingStore = create<SharingState>((set, get) => ({
+export const useSharingStore = create<SharingState>((set) => ({
   // Initial state
   members: [],
   isLoadingMembers: false,
@@ -317,11 +329,11 @@ export const useSharingStore = create<SharingState>((set, get) => ({
       return [];
     }
   }
-}));
+})); 
 
-registerSharingSocketListeners(useSharingStore.setState, useSharingStore.getState); 
+registerSharingSocketListeners(useSharingStore.setState); 
 
 // Log members array after every update
 useSharingStore.subscribe(state => {
-  // console.log('[useSharingStore] Members updated:', state.members);
+  console.log('[useSharingStore] Members updated:', state.members);
 }); 
