@@ -8,12 +8,19 @@ const token = localStorage.getItem('jwt');
 
 export const socket: Socket = io(API_URL, {
   auth: { token },
-  autoConnect: true, // Always connect immediately
+  autoConnect: false, // Only connect after login
   transports: ['websocket'],
   reconnection: true,
   reconnectionAttempts: 10,
   reconnectionDelay: 1000,
 });
+
+// Connect socket after login
+export function connectSocket() {
+  if (!socket.connected) {
+    socket.connect();
+  }
+}
 
 // Typed emit helper
 export function emitSocketEvent<TPayload, TAck = void>(
@@ -43,6 +50,10 @@ socket.on('connect_error', (err) => {
 // Utility to update token on login
 export function setSocketAuthToken(newToken: string) {
   socket.auth = { token: newToken };
+  if (socket.connected) {
+    socket.disconnect();
+    socket.connect();
+  }
 }
 
 export function getSocketId() {

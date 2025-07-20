@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { User, AuthState } from '../types';
 import { api } from '../api';
+import { setSocketAuthToken, connectSocket } from '../api/socket';
 
 interface AuthStore extends AuthState {
   token: string | null;
@@ -28,6 +29,8 @@ export const useAuthStore = create<AuthStore>()(
               token: res.token,
             });
             localStorage.setItem('jwt', res.token);
+            setSocketAuthToken(res.token);
+            connectSocket();
             return { success: true };
           } else {
             return { success: false, error: res.message || 'Login failed' };

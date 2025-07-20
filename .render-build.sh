@@ -5,4 +5,4 @@ echo "Using custom build script..."
 cd backend
 export NODE_ENV=production
 npm install
-npm run build 
+npm run build
