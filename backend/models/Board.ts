@@ -139,16 +139,17 @@ boardSchema.index({ "members.userId": 1 });
 // Ensure tasks Map is serialized as a plain object
 boardSchema.set('toJSON', {
   transform: (doc, ret) => {
+    const out: any = { ...ret };
     if (!ret.tasks) {
-      ret.tasks = {};
+      out.tasks = {};
     } else if (ret.tasks instanceof Map) {
-      ret.tasks = Object.fromEntries(ret.tasks);
+      out.tasks = Object.fromEntries(ret.tasks);
     } else if (typeof ret.tasks === 'object' && !Array.isArray(ret.tasks)) {
       // Already a plain object
     } else {
-      ret.tasks = {};
+      out.tasks = {};
     }
-    return ret;
+    return out;
   }
 });
 
